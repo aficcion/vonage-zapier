@@ -5,8 +5,8 @@ set -e
 export PATH="/opt/homebrew/bin:$PATH"
 cd "$(dirname "$0")"
 
-VOICE="Daniel"        # en-GB
-RATE=168
+VOICE="en-US-AriaNeural"   # edge-tts neural voice
+EDGE_RATE="-8%"            # a touch slower than default
 W=1280; H=650; FPS=15
 WORK=$(mktemp -d)
 echo "workdir: $WORK"
@@ -14,19 +14,19 @@ echo "workdir: $WORK"
 # section: name | visual | is_image | narration
 build_section () {
   local name="$1" visual="$2" isimg="$3" text="$4"
-  local aif="$WORK/$name.aiff" seg="$WORK/$name.mp4"
+  local aud="$WORK/$name.mp3" seg="$WORK/$name.mp4"
   printf '%s' "$text" > "$WORK/$name.txt"
-  say -v "$VOICE" -r "$RATE" -f "$WORK/$name.txt" -o "$aif"
+  python3 -m edge_tts --voice "$VOICE" --rate="$EDGE_RATE" --file "$WORK/$name.txt" --write-media "$aud"
   local adur vdur
-  adur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$aif")
+  adur=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$aud")
   vdur=$(awk "BEGIN{print $adur + 0.8}")
   local padcolor="white"; [ "$isimg" = "1" ] && padcolor="0x0d1224"
   if [ "$isimg" = "1" ]; then
-    ffmpeg -y -loglevel error -loop 1 -framerate $FPS -i "$visual" -i "$aif" \
+    ffmpeg -y -loglevel error -loop 1 -framerate $FPS -i "$visual" -i "$aud" \
       -filter_complex "[0:v]scale=$W:$H:force_original_aspect_ratio=decrease,pad=$W:$H:(ow-iw)/2:(oh-ih)/2:color=$padcolor,fps=$FPS,format=yuv420p[v];[1:a]aresample=48000,apad[a]" \
       -map "[v]" -map "[a]" -t "$vdur" -c:v libx264 -profile:v high -pix_fmt yuv420p -r $FPS -c:a aac -ar 48000 -ac 2 -b:a 128k "$seg"
   else
-    ffmpeg -y -loglevel error -ignore_loop 0 -i "$visual" -i "$aif" \
+    ffmpeg -y -loglevel error -ignore_loop 0 -i "$visual" -i "$aud" \
       -filter_complex "[0:v]scale=$W:$H:force_original_aspect_ratio=decrease,pad=$W:$H:(ow-iw)/2:(oh-ih)/2:color=$padcolor,fps=$FPS,format=yuv420p[v];[1:a]aresample=48000,apad[a]" \
       -map "[v]" -map "[a]" -t "$vdur" -c:v libx264 -profile:v high -pix_fmt yuv420p -r $FPS -c:a aac -ar 48000 -ac 2 -b:a 128k "$seg"
   fi
