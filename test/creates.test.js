@@ -113,13 +113,38 @@ describe('Session 3 — recepción y bordes', () => {
 describe('send_message', () => {
   test('supports all channels', () => {
     const channelField = App.creates.send_message.operation.inputFields.find(
-      (f) => f.key === 'channel'
+      (f) => typeof f === 'object' && f.key === 'channel'
     );
     const values = channelField.choices;
     expect(values).toContain('sms');
     expect(values).toContain('whatsapp');
     expect(values).toContain('rcs');
     expect(values).toContain('viber_service');
+  });
+
+  test('Message Type choices depend on the channel', () => {
+    const dynFns = App.creates.send_message.operation.inputFields.filter(
+      (f) => typeof f === 'function'
+    );
+    // First dynamic function is the Message Type field.
+    const mtForSms = dynFns[0](null, { inputData: { channel: 'sms' } });
+    expect(mtForSms.choices).toEqual(['text']);
+    const mtForWa = dynFns[0](null, { inputData: { channel: 'whatsapp' } });
+    expect(mtForWa.choices).toContain('template');
+    expect(mtForWa.choices).toContain('image');
+  });
+
+  test('only the content fields for the chosen message type are shown', () => {
+    const dynFns = App.creates.send_message.operation.inputFields.filter(
+      (f) => typeof f === 'function'
+    );
+    const contentFn = dynFns[1];
+    const textFields = contentFn(null, { inputData: { messageType: 'text' } }).map((f) => f.key);
+    expect(textFields).toEqual(['text']);
+    const imgFields = contentFn(null, { inputData: { messageType: 'image' } }).map((f) => f.key);
+    expect(imgFields).toEqual(['imageUrl', 'imageCaption']);
+    const tplFields = contentFn(null, { inputData: { messageType: 'template' } }).map((f) => f.key);
+    expect(tplFields).toContain('templateName');
   });
 });
 
