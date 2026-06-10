@@ -67,16 +67,13 @@ const perform = async (z, bundle) => {
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
-      ...(config.requiresApp
-        ? { Authorization: `Bearer ${bundle.authData._jwt}` }
-        : {}),
+      Authorization: config.requiresApp
+        ? `Bearer ${bundle.authData._jwt}`
+        : `Basic ${Buffer.from(
+            `${bundle.authData.apiKey}:${bundle.authData.apiSecret}`
+          ).toString('base64')}`,
     },
     body: payload,
-    ...(config.requiresApp
-      ? {}
-      : {
-          auth: [bundle.authData.apiKey, bundle.authData.apiSecret],
-        }),
   });
 
   if (response.status >= 400) {

@@ -4,8 +4,12 @@ const perform = async (z, bundle) => {
   const response = await z.request({
     url: `https://api.nexmo.com/v2/verify/${bundle.inputData.requestId}/cancel`,
     method: 'DELETE',
-    headers: { Accept: 'application/json' },
-    auth: [bundle.authData.apiKey, bundle.authData.apiSecret],
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Basic ${Buffer.from(
+        `${bundle.authData.apiKey}:${bundle.authData.apiSecret}`
+      ).toString('base64')}`,
+    },
   });
 
   if (response.status === 204) {

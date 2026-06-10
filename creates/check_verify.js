@@ -7,8 +7,10 @@ const perform = async (z, bundle) => {
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      Authorization: `Basic ${Buffer.from(
+        `${bundle.authData.apiKey}:${bundle.authData.apiSecret}`
+      ).toString('base64')}`,
     },
-    auth: [bundle.authData.apiKey, bundle.authData.apiSecret],
     body: { code: bundle.inputData.code },
   });
 
