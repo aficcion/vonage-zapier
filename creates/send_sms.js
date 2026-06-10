@@ -5,7 +5,7 @@
 // linked, unlinked, or alphanumeric — so SMS never needs per-sender custody.
 // The middleware injects the token (see the "Bearer undefined" patch).
 const perform = async (z, bundle) => {
-  const { from, to, text, unicode, ttl } = bundle.inputData;
+  const { from, to, text, unicode, ttl, sandbox } = bundle.inputData;
 
   const payload = {
     channel: 'sms',
@@ -18,8 +18,9 @@ const perform = async (z, bundle) => {
     ...(ttl ? { ttl: parseInt(ttl, 10) } : {}),
   };
 
+  const host = sandbox ? 'messages-sandbox.nexmo.com' : 'api.nexmo.com';
   const response = await z.request({
-    url: 'https://api.nexmo.com/v1/messages',
+    url: `https://${host}/v1/messages`,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -95,6 +96,15 @@ module.exports = {
         type: 'integer',
         required: false,
         helpText: 'Message time-to-live in milliseconds.',
+      },
+      {
+        key: 'sandbox',
+        label: 'Sandbox Mode',
+        type: 'boolean',
+        required: false,
+        default: 'false',
+        helpText:
+          'Send through the Vonage Messages Sandbox (messages-sandbox.nexmo.com) for testing instead of live delivery.',
       },
     ],
     perform,

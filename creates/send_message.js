@@ -52,8 +52,11 @@ const perform = async (z, bundle) => {
 
   // Every channel signs with the managed application JWT (injected by the
   // middleware via the "Bearer undefined" patch).
+  const host = bundle.inputData.sandbox
+    ? 'messages-sandbox.nexmo.com'
+    : 'api.nexmo.com';
   const response = await z.request({
-    url: 'https://api.nexmo.com/v1/messages',
+    url: `https://${host}/v1/messages`,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -91,6 +94,15 @@ module.exports = {
   },
   operation: {
     inputFields: [
+      {
+        key: 'channelHelp',
+        type: 'copy',
+        helpText:
+          'Chat channels need a sender registered on your Vonage account first: ' +
+          '[WhatsApp](https://dashboard.nexmo.com/messages/social-channels), ' +
+          '[RCS](https://dashboard.nexmo.com/messages/social-channels), ' +
+          'Viber & Messenger (sales onboarding). SMS works with any of your Vonage numbers.',
+      },
       {
         key: 'channel',
         label: 'Channel',
@@ -191,6 +203,15 @@ module.exports = {
         type: 'text',
         required: false,
         helpText: 'JSON array of WhatsApp template components (header, body, buttons).',
+      },
+      {
+        key: 'sandbox',
+        label: 'Sandbox Mode',
+        type: 'boolean',
+        required: false,
+        default: 'false',
+        helpText:
+          'Send through the Vonage Messages Sandbox (messages-sandbox.nexmo.com) for testing instead of live delivery.',
       },
     ],
     perform,

@@ -68,6 +68,34 @@ describe('hidden From-dropdown triggers', () => {
   });
 });
 
+describe('Session 3 — recepción y bordes', () => {
+  test('delivery_receipt trigger is registered as a hook', () => {
+    expect(App.triggers.delivery_receipt).toBeDefined();
+    expect(App.triggers.delivery_receipt.operation.type).toBe('hook');
+  });
+
+  test('hook triggers expose the takeOver field', () => {
+    ['inbound_sms', 'delivery_receipt', 'call_status', 'message_status',
+      'verify_event', 'inbound_call', 'inbound_message'].forEach((key) => {
+      const fields = App.triggers[key].operation.inputFields.map((f) => f.key);
+      expect(fields).toContain('takeOver');
+    });
+  });
+
+  test('isForeignUrl protects only foreign URLs', () => {
+    const { isForeignUrl } = require('../app_webhooks');
+    expect(isForeignUrl('https://hooks.zapier.com/abc', '')).toBe(false);
+    expect(isForeignUrl('', '')).toBe(false);
+    expect(isForeignUrl('https://mine.example.com/x', 'https://mine.example.com/x')).toBe(false);
+    expect(isForeignUrl('https://someone-else.com/hook', '')).toBe(true);
+  });
+
+  test('Send SMS and Send Message offer a sandbox toggle', () => {
+    expect(App.creates.send_sms.operation.inputFields.map((f) => f.key)).toContain('sandbox');
+    expect(App.creates.send_message.operation.inputFields.map((f) => f.key)).toContain('sandbox');
+  });
+});
+
 describe('send_message', () => {
   test('supports all channels', () => {
     const channelField = App.creates.send_message.operation.inputFields.find(

@@ -11,7 +11,7 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const { makeAppWebhookHooks } = require('../app_webhooks');
+const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'verify',
@@ -83,6 +83,7 @@ module.exports = {
         default: 'completed,failed',
         helpText: 'Which Verify event types should trigger this Zap.',
       },
+      takeOverField,
     ],
     sample: {
       requestId: 'c11236f4-00bf-4b89-84ba-88b25df97315',

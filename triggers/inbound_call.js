@@ -13,7 +13,7 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const { makeAppWebhookHooks } = require('../app_webhooks');
+const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'voice',
@@ -63,6 +63,7 @@ module.exports = {
     performUnsubscribe: unsubscribeHook,
     perform: getInboundCall,
     performList,
+    inputFields: [takeOverField],
     sample: {
       uuid: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',
       status: 'ringing',

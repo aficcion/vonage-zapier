@@ -18,39 +18,17 @@ const performList = async (z, bundle) => {
   ];
 };
 
-// Vonage has no per-subscription webhook API for account-level inbound SMS;
-// the single moCallBackUrl on Account Settings is the registration point.
-// Subscribing overwrites it with Zapier's hook URL (and returns the previous
-// value so a future enhancement could restore it on unsubscribe).
-const setAccountInboundUrl = async (z, bundle, url) => {
-  const response = await z.request({
-    url: 'https://rest.nexmo.com/account/settings',
-    method: 'POST',
-    params: {
-      api_key: bundle.authData.apiKey,
-      api_secret: bundle.authData.apiSecret,
-      moCallBackUrl: url,
-    },
-  });
+// The single moCallBackUrl on Account Settings is the registration point for
+// inbound SMS on numbers not linked to an application. The shared helper reads
+// the slot first (warn-don't-clobber) and restores the previous URL on
+// unsubscribe.
+const { makeAccountWebhookHooks, takeOverField } = require('../account_settings');
 
-  if (response.status >= 400) {
-    throw new z.errors.Error(
-      `Could not update Vonage inbound webhook: HTTP ${response.status}`
-    );
-  }
-
-  return response.json;
-};
-
-const subscribeHook = async (z, bundle) => {
-  const settings = await setAccountInboundUrl(z, bundle, bundle.targetUrl);
-  return { webhookUrl: bundle.targetUrl, previousUrl: settings['mo-callback-url'] || '' };
-};
-
-const unsubscribeHook = async (z, bundle) => {
-  await setAccountInboundUrl(z, bundle, '');
-  return {};
-};
+const { subscribeHook, unsubscribeHook } = makeAccountWebhookHooks(
+  'moCallBackUrl',
+  'mo-callback-url',
+  'inbound SMS'
+);
 
 const getInboundSms = (z, bundle) => {
   // Vonage may deliver inbound SMS as GET (query params) or POST (body)
@@ -96,6 +74,7 @@ module.exports = {
     performUnsubscribe: unsubscribeHook,
     perform: getInboundSms,
     performList,
+    inputFields: [takeOverField],
     sample: {
       msisdn: '15559876543',
       to: '15551234567',
