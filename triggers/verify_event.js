@@ -11,13 +11,12 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const subscribeHook = async (z, bundle) => {
-  return { webhookUrl: bundle.targetUrl };
-};
+const { makeAppWebhookHooks } = require('../app_webhooks');
 
-const unsubscribeHook = async (z, bundle) => {
-  return {};
-};
+const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
+  'verify',
+  'status_url'
+);
 
 const getVerifyEvent = (z, bundle) => {
   const payload = bundle.cleanedRequest;
@@ -47,7 +46,7 @@ module.exports = {
   display: {
     label: 'Verify Event (2FA)',
     description:
-      'Triggers when a Vonage Verify v2 workflow emits an event (completed, failed, expired, etc.). Set your Verify callback URL to the Zapier webhook URL.',
+      'Triggers when a Vonage Verify v2 workflow emits an event (completed, failed, expired, etc.). Turning the Zap on registers the webhook on your Vonage Application automatically; verifications must be started with that application (JWT) for events to flow.',
   },
   operation: {
     type: 'hook',

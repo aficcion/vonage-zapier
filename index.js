@@ -7,6 +7,7 @@ const { addJwtToBundle } = require('./jwt_middleware');
 
 // Triggers
 const inboundSms = require('./triggers/inbound_sms');
+const inboundMessage = require('./triggers/inbound_message');
 const inboundCall = require('./triggers/inbound_call');
 const callStatus = require('./triggers/call_status');
 const messageStatus = require('./triggers/message_status');
@@ -37,6 +38,7 @@ module.exports = {
 
   triggers: {
     [inboundSms.key]: inboundSms,
+    [inboundMessage.key]: inboundMessage,
     [inboundCall.key]: inboundCall,
     [callStatus.key]: callStatus,
     [messageStatus.key]: messageStatus,

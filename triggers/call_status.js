@@ -16,13 +16,12 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const subscribeHook = async (z, bundle) => {
-  return { webhookUrl: bundle.targetUrl };
-};
+const { makeAppWebhookHooks } = require('../app_webhooks');
 
-const unsubscribeHook = async (z, bundle) => {
-  return {};
-};
+const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
+  'voice',
+  'event_url'
+);
 
 const getCallStatus = (z, bundle) => {
   const payload = bundle.cleanedRequest;
@@ -58,7 +57,7 @@ module.exports = {
   display: {
     label: 'Call Status Changed',
     description:
-      'Triggers when a Vonage call reaches a selected status (e.g. completed, failed). Set your Vonage Application Event URL to the Zapier webhook URL.',
+      'Triggers when a Vonage call reaches a selected status (e.g. completed, failed). Turning the Zap on registers the application Event URL automatically (one Zap per application at a time).',
   },
   operation: {
     type: 'hook',

@@ -13,13 +13,12 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const subscribeHook = async (z, bundle) => {
-  return { webhookUrl: bundle.targetUrl };
-};
+const { makeAppWebhookHooks } = require('../app_webhooks');
 
-const unsubscribeHook = async (z, bundle) => {
-  return {};
-};
+const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
+  'messages',
+  'status_url'
+);
 
 const getMessageStatus = (z, bundle) => {
   const payload = bundle.cleanedRequest;
@@ -50,7 +49,7 @@ module.exports = {
   display: {
     label: 'Message Status Updated',
     description:
-      'Triggers when a Vonage Messages API message reaches a selected status (delivered, failed, etc.). Set your Vonage Application Status URL to the Zapier webhook URL.',
+      'Triggers when a Vonage Messages API message reaches a selected status (delivered, failed, etc.). Turning the Zap on registers the application Status URL automatically (one Zap per application at a time).',
   },
   operation: {
     type: 'hook',

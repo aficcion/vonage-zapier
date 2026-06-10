@@ -13,16 +13,23 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const subscribeHook = async (z, bundle) => {
-  return { webhookUrl: bundle.targetUrl };
-};
+const { makeAppWebhookHooks } = require('../app_webhooks');
 
-const unsubscribeHook = async (z, bundle) => {
-  return {};
-};
+const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
+  'voice',
+  'event_url'
+);
 
 const getInboundCall = (z, bundle) => {
   const payload = bundle.cleanedRequest;
+
+  // The application's event_url receives every event of every call on this
+  // application; this trigger only fires for the first event of an inbound
+  // call. Use the Call Status trigger for the full lifecycle.
+  if (payload.direction !== 'inbound' || payload.status !== 'ringing') {
+    return [];
+  }
+
   return [
     {
       uuid: payload.uuid,
@@ -48,9 +55,7 @@ module.exports = {
   display: {
     label: 'New Inbound Call',
     description:
-      'Triggers when an inbound call is received on your Vonage virtual number.',
-    directions:
-      '1. Enable this trigger to get a Zapier webhook URL.\n2. In your [Vonage Application](https://dashboard.nexmo.com/applications), set the **Answer URL** (or **Event URL**) to the Zapier webhook URL.\n3. Call your Vonage number to test.',
+      'Triggers when an inbound call is received on a number linked to your Vonage Application. Turning the Zap on registers the application Event URL automatically (one Zap per application at a time).',
   },
   operation: {
     type: 'hook',
