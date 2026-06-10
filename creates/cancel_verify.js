@@ -2,7 +2,7 @@
 
 const perform = async (z, bundle) => {
   const response = await z.request({
-    url: `https://api.nexmo.com/v2/verify/${bundle.inputData.requestId}/cancel`,
+    url: `https://api.nexmo.com/v2/verify/${bundle.inputData.requestId}`,
     method: 'DELETE',
     headers: {
       Accept: 'application/json',
