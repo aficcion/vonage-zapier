@@ -15,7 +15,8 @@ const CAPTION_CHANNELS = ['whatsapp', 'mms', 'messenger', 'viber_service'];
 const buildMessagePayload = (inputData) => {
   const { channel, messageType, to, from, text, imageUrl, imageCaption,
     audioUrl, videoUrl, fileUrl, templateName, templateLanguage,
-    templateComponents } = inputData;
+    templateComponents, cardMediaUrl, cardTitle, cardText, cardMediaHeight,
+    cardButtons } = inputData;
 
   const base = {
     channel,
@@ -51,6 +52,31 @@ const buildMessagePayload = (inputData) => {
         components: templateComponents ? JSON.parse(templateComponents) : [],
       },
     };
+  }
+
+  if (messageType === 'card') {
+    // Zapier list fields can arrive as a single comma-joined string — split and
+    // cap at 4 reply suggestions.
+    const buttons = (Array.isArray(cardButtons) ? cardButtons : [cardButtons])
+      .filter(Boolean)
+      .flatMap((s) => String(s).split(','))
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .slice(0, 4);
+    const card = {
+      media_url: cardMediaUrl,
+      media_height: cardMediaHeight || 'MEDIUM',
+    };
+    if (cardTitle) card.title = cardTitle;
+    if (cardText) card.text = cardText;
+    if (buttons.length) {
+      card.suggestions = buttons.map((t, i) => ({
+        type: 'reply',
+        text: t,
+        postback_data: `btn_${i + 1}`,
+      }));
+    }
+    return { ...base, card, rcs: { card_orientation: 'VERTICAL' } };
   }
 
   return base;
@@ -103,7 +129,7 @@ const TYPES_BY_CHANNEL = {
   mms: ['image', 'audio', 'video', 'file'],
   viber_service: ['text', 'image', 'video', 'file'],
   messenger: ['text', 'image', 'audio', 'video', 'file'],
-  rcs: ['text', 'image', 'video', 'file'],
+  rcs: ['text', 'image', 'video', 'file', 'card'],
 };
 const ALL_TYPES = ['text', 'image', 'audio', 'video', 'file', 'template'];
 
@@ -129,6 +155,14 @@ const CONTENT_FIELDS = {
     { key: 'templateName', label: 'Template Name', type: 'string', required: true, helpText: 'WhatsApp approved template name.' },
     { key: 'templateLanguage', label: 'Template Language Code', type: 'string', required: false, default: 'en_US' },
     { key: 'templateComponents', label: 'Template Components (JSON)', type: 'text', required: false, helpText: 'JSON array of WhatsApp template components (header, body, buttons).' },
+  ],
+  // RCS Rich Card — image + title + description + up to 4 reply buttons.
+  card: [
+    { key: 'cardMediaUrl', label: 'Image / Media URL', type: 'string', required: true, helpText: 'Direct URL of the image (or video/PDF) shown on the card. Must return media, not a web page.' },
+    { key: 'cardTitle', label: 'Card Title', type: 'string', required: false, helpText: 'Up to 200 characters.' },
+    { key: 'cardText', label: 'Card Description', type: 'text', required: false, helpText: 'Up to 2000 characters.' },
+    { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'] },
+    { key: 'cardButtons', label: 'Reply Buttons', type: 'string', required: false, list: true, helpText: 'Up to 4 quick-reply buttons. Each label becomes a tappable reply in the card.' },
   ],
 };
 
