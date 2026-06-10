@@ -45,6 +45,16 @@ explicable tiene TRES niveles:
 | **Aplicación** | Par de claves RSA — **solo UNA clave pública por app** | Por capability: messages inbound/status, voice events, verify status | Messages API (WhatsApp/RCS/MMS/Viber), Voice, y todo recurso vinculado |
 | **Recurso** (número / sender WhatsApp / agente RCS) | — | Hereda: vinculado a una app → webhooks de la app; libre → webhooks de cuenta | — |
 
+**Principio (decisión 10-jun): Messages API only.** La SMS API clásica no aporta
+nada y Vonage la está deprecando; ambos conectores deben usar la Messages API
+para TODO el envío de mensajes (el conector PA ya migró en v2.0.0). Clave que lo
+hace indoloro: la Messages API acepta Basic auth — solo exige JWT cuando el
+remitente está vinculado a una app. Y los webhooks de CUENTA (API Settings)
+sirven para la Messages API: ahí se elige qué API/formato gobierna esos huecos
+(la cuenta de Carlos ya está en formato Messages API — es lo que destapó el bug
+nº 3). El modelo queda: **una sola API de mensajería, dos niveles de identidad;
+el nivel lo decide una pregunta: ¿el remitente está vinculado a una app?**
+
 Reglas y trampas (validadas empíricamente en los PoCs):
 
 - **Una app : N números. Un número : UNA app.** Un sender/agente pertenece a una app.
@@ -79,6 +89,7 @@ acantilado al pasar de SMS a canales modernos.
 | **P2** | `client_ref: "vonage-zapier"` | En todos los envíos (SMS API y Messages API), sobreescribible por campo opcional. Atribución para métricas de producto. |
 | **P2** | Trigger de acuses a nivel CUENTA | Hueco detectado: Message Status solo escucha el nivel app; los DLR de los SMS enviados con Send SMS (API clásica, Basic) caen en el Status webhook de CUENTA (`drCallBackUrl`), hoy sin cubrir. Mismo patrón de auto-suscripción que el inbound SMS de cuenta. Y en ambos huecos de cuenta: si ya hay una URL configurada, AVISAR en vez de pisarla en silencio (son globales y compartidos con otros sistemas del usuario). |
 | **P2** | RCS rico (card/carrusel) | Ampliar Send Message con messageType `card`/`carousel` reutilizando los payloads que el conector PA ya manda (los del swagger `/send/card`, `/send/carousel`). |
+| **P2** | Messages API only | Send SMS mantiene su UX (from/to/text) pero por debajo pasa de `rest.nexmo.com/sms/json` a `POST /v1/messages` (channel sms) con Basic; si el remitente está vinculado a una app, JWT según el modelo de custodia del P1. Retirar la SMS API clásica del conector. Los triggers de cuenta (inbound + DLR) siguen valiendo: mismos huecos, formato Messages API (ya soportado tras el bug nº 3). |
 | **P3** | Errores traducidos | Estilo `_verr`: mapear 401/403 → "revisa credenciales/Application ID", extraer `title`/`detail` del problem+json de Vonage en vez de JSON.stringify crudo. |
 
 ## Mejoras comunes
