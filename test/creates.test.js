@@ -68,6 +68,20 @@ describe('hidden From-dropdown triggers', () => {
   });
 });
 
+describe('phone normalization', () => {
+  const { normalizePhone } = require('../phone');
+  test('strips +, spaces, dashes and parens from numbers', () => {
+    expect(normalizePhone('+34 622 293 256')).toBe('34622293256');
+    expect(normalizePhone('+1 (415) 738-6102')).toBe('14157386102');
+    expect(normalizePhone('447418348162')).toBe('447418348162');
+  });
+  test('leaves alphanumeric senders, agent ids and emails untouched', () => {
+    expect(normalizePhone('MyBrand')).toBe('MyBrand');
+    expect(normalizePhone('carlos')).toBe('carlos');
+    expect(normalizePhone('user@example.com')).toBe('user@example.com');
+  });
+});
+
 describe('Session 3 — recepción y bordes', () => {
   test('delivery_receipt trigger is registered as a hook', () => {
     expect(App.triggers.delivery_receipt).toBeDefined();

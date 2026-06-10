@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizePhone } = require('../phone');
+
 const LEVEL_URLS = {
   basic: 'https://api.nexmo.com/ni/basic/json',
   standard: 'https://api.nexmo.com/ni/standard/json',
@@ -13,7 +15,7 @@ const perform = async (z, bundle) => {
   const params = {
     api_key: bundle.authData.apiKey,
     api_secret: bundle.authData.apiSecret,
-    number: bundle.inputData.number,
+    number: normalizePhone(bundle.inputData.number),
     ...(bundle.inputData.countryCode ? { country: bundle.inputData.countryCode } : {}),
     ...(level !== 'basic' && bundle.inputData.cnam ? { cnam: true } : {}),
   };
