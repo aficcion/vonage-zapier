@@ -8,7 +8,7 @@
 - New trigger: Delivery Receipt Received (account-level). Triggers that register a Vonage webhook now protect a URL another integration set, unless you opt to take it over, and restore the previous URL when the Zap is turned off.
 - Phone numbers are normalized automatically — you can paste them with a leading "+", spaces or dashes and they're cleaned before sending. Alphanumeric sender IDs and emails are left untouched.
 - Send Message now shows only the relevant fields: the Message Type list adapts to the chosen channel, and only the content fields for that type appear (e.g. an Image URL for images, the template fields for templates) instead of every field at once.
-- RCS Rich Card: a new message type for RCS that sends an image with a title, description and up to 4 tappable reply buttons in a single card.
+- RCS Rich Card: a new message type for RCS that sends an image with a title, description and up to 4 tappable buttons in a single card. Each button can be a quick reply, an "open URL" link, or a "dial" call, configured as repeatable line items.
 
 ## 1.0.0
 
