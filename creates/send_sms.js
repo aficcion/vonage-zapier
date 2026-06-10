@@ -1,36 +1,49 @@
 'use strict';
 
+// Send SMS over the Messages API (POST /v1/messages), signed with the managed
+// application JWT. The managed JWT is accepted for any sender on the account —
+// linked, unlinked, or alphanumeric — so SMS never needs per-sender custody.
+// The middleware injects the token (see the "Bearer undefined" patch).
 const perform = async (z, bundle) => {
+  const { from, to, text, unicode, ttl } = bundle.inputData;
+
+  const payload = {
+    channel: 'sms',
+    message_type: 'text',
+    from,
+    to,
+    text,
+    client_ref: 'vonage-zapier',
+    sms: { encoding_type: unicode ? 'unicode' : 'text' },
+    ...(ttl ? { ttl: parseInt(ttl, 10) } : {}),
+  };
+
   const response = await z.request({
-    url: 'https://rest.nexmo.com/sms/json',
+    url: 'https://api.nexmo.com/v1/messages',
     method: 'POST',
-    body: {
-      api_key: bundle.authData.apiKey,
-      api_secret: bundle.authData.apiSecret,
-      from: bundle.inputData.from,
-      to: bundle.inputData.to,
-      text: bundle.inputData.text,
-      type: bundle.inputData.unicode ? 'unicode' : 'text',
-      ttl: bundle.inputData.ttl || undefined,
-      status_report_req: bundle.inputData.statusReport ? 1 : 0,
-      callback: bundle.inputData.webhookUrl || undefined,
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${bundle.authData._jwt}`,
     },
+    body: payload,
+    skipThrowForStatus: true,
   });
 
-  const data = response.json;
-  if (data.messages[0].status !== '0') {
+  if (response.status >= 400) {
+    const err = response.json || {};
     throw new z.errors.Error(
-      `Vonage SMS error: ${data.messages[0]['error-text']} (status ${data.messages[0].status})`
+      `Vonage SMS error: ${err.title || err.detail || JSON.stringify(err)}`
     );
   }
 
+  const data = response.json || {};
   return {
-    messageId: data.messages[0]['message-id'],
-    to: data.messages[0].to,
-    remainingBalance: data.messages[0]['remaining-balance'],
-    messagePrice: data.messages[0]['message-price'],
-    network: data.messages[0].network,
-    status: data.messages[0].status,
+    messageId: data.message_uuid,
+    messageUuid: data.message_uuid,
+    to,
+    from,
+    status: 'submitted',
   };
 };
 
@@ -39,7 +52,7 @@ module.exports = {
   noun: 'SMS',
   display: {
     label: 'Send SMS',
-    description: 'Send an SMS message via the Vonage SMS API.',
+    description: 'Send an SMS message via Vonage.',
   },
   operation: {
     inputFields: [
@@ -48,8 +61,9 @@ module.exports = {
         label: 'From',
         type: 'string',
         required: true,
+        dynamic: 'list_numbers.id.label',
         helpText:
-          'Your Vonage virtual number or alphanumeric sender ID (e.g. `15551234567` or `MyBrand`).',
+          'Pick one of your Vonage numbers, or type a virtual number or alphanumeric sender ID (e.g. `MyBrand`).',
       },
       {
         key: 'to',
@@ -63,7 +77,8 @@ module.exports = {
         label: 'Message Text',
         type: 'text',
         required: true,
-        helpText: 'The body of the SMS. Standard GSM-7 messages support up to 160 characters per segment.',
+        helpText:
+          'The body of the SMS. Standard GSM-7 messages support up to 160 characters per segment.',
       },
       {
         key: 'unicode',
@@ -71,39 +86,24 @@ module.exports = {
         type: 'boolean',
         required: false,
         default: 'false',
-        helpText: 'Enable for emoji or non-Latin characters. Reduces per-segment limit to 70 characters.',
+        helpText:
+          'Enable for emoji or non-Latin characters. Reduces per-segment limit to 70 characters.',
       },
       {
         key: 'ttl',
         label: 'TTL (ms)',
         type: 'integer',
         required: false,
-        helpText: 'Message time-to-live in milliseconds. Min 20000, max 604800000.',
-      },
-      {
-        key: 'statusReport',
-        label: 'Request Delivery Receipt',
-        type: 'boolean',
-        required: false,
-        default: 'false',
-        helpText: 'Ask Vonage to send a delivery receipt to your webhook URL.',
-      },
-      {
-        key: 'webhookUrl',
-        label: 'Delivery Receipt Webhook URL',
-        type: 'string',
-        required: false,
-        helpText: 'URL that Vonage will POST the delivery receipt to.',
+        helpText: 'Message time-to-live in milliseconds.',
       },
     ],
     perform,
     sample: {
-      messageId: '0A0000000123ABCD1',
+      messageId: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',
+      messageUuid: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',
       to: '15559876543',
-      remainingBalance: '3.14159',
-      messagePrice: '0.0333',
-      network: '23410',
-      status: '0',
+      from: '15551234567',
+      status: 'submitted',
     },
   },
 };

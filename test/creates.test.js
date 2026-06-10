@@ -50,6 +50,22 @@ describe('send_sms', () => {
     expect(fields).toContain('to');
     expect(fields).toContain('text');
   });
+
+  test('From field uses the dynamic numbers dropdown', () => {
+    const from = App.creates.send_sms.operation.inputFields.find(
+      (f) => f.key === 'from'
+    );
+    expect(from.dynamic).toBe('list_numbers.id.label');
+  });
+});
+
+describe('hidden From-dropdown triggers', () => {
+  test('list_numbers and list_senders are registered and hidden', () => {
+    expect(App.triggers.list_numbers).toBeDefined();
+    expect(App.triggers.list_numbers.display.hidden).toBe(true);
+    expect(App.triggers.list_senders).toBeDefined();
+    expect(App.triggers.list_senders.display.hidden).toBe(true);
+  });
 });
 
 describe('send_message', () => {

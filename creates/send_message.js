@@ -1,20 +1,23 @@
 'use strict';
 
-const CHANNEL_CONFIGS = {
-  sms: { requiresApp: false },
-  whatsapp: { requiresApp: true },
-  mms: { requiresApp: true },
-  viber_service: { requiresApp: true },
-  messenger: { requiresApp: true },
-  rcs: { requiresApp: true },
-};
+// Chat channels require the sender to be registered (and linked to an
+// application) on the Vonage side. SMS does not — the managed JWT signs any
+// sender. `isChat` decides whether a sender-not-registered API error gets
+// translated into product language.
+const CHAT_CHANNELS = ['whatsapp', 'mms', 'viber_service', 'messenger', 'rcs'];
 
 const buildMessagePayload = (inputData) => {
   const { channel, messageType, to, from, text, imageUrl, imageCaption,
     audioUrl, videoUrl, fileUrl, templateName, templateLanguage,
     templateComponents } = inputData;
 
-  const base = { channel, message_type: messageType, to, from };
+  const base = {
+    channel,
+    message_type: messageType,
+    to,
+    from,
+    client_ref: 'vonage-zapier',
+  };
 
   if (messageType === 'text') return { ...base, text };
 
@@ -43,44 +46,36 @@ const buildMessagePayload = (inputData) => {
 };
 
 const perform = async (z, bundle) => {
-  const { channel } = bundle.inputData;
-  const config = CHANNEL_CONFIGS[channel] || {};
-
-  if (config.requiresApp && (!bundle.authData.applicationId || !bundle.authData.privateKey)) {
-    throw new z.errors.Error(
-      `The ${channel} channel requires an Application ID and Private Key in your Vonage connection.`
-    );
-  }
+  const { channel, from } = bundle.inputData;
 
   const payload = buildMessagePayload(bundle.inputData);
 
-  const headers = {};
-  if (config.requiresApp) {
-    // JWT auth for application-based channels
-    const jwt = z.dehydrateFile; // handled by Zapier's auth layer via middleware
-    headers['Authorization'] = `Bearer ${bundle.authData._jwt}`;
-  }
-
+  // Every channel signs with the managed application JWT (injected by the
+  // middleware via the "Bearer undefined" patch).
   const response = await z.request({
     url: 'https://api.nexmo.com/v1/messages',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      Authorization: config.requiresApp
-        ? `Bearer ${bundle.authData._jwt}`
-        : `Basic ${Buffer.from(
-            `${bundle.authData.apiKey}:${bundle.authData.apiSecret}`
-          ).toString('base64')}`,
+      Accept: 'application/json',
+      Authorization: `Bearer ${bundle.authData._jwt}`,
     },
     body: payload,
+    skipThrowForStatus: true,
   });
 
   if (response.status >= 400) {
-    const err = response.json;
-    throw new z.errors.Error(
-      `Messages API error: ${err.title || err.detail || JSON.stringify(err)}`
-    );
+    const err = response.json || {};
+    const detail = err.title || err.detail || JSON.stringify(err);
+
+    // On chat channels a 401/403/4xx almost always means the sender isn't
+    // registered for that channel on this account. Say so in plain language.
+    if (CHAT_CHANNELS.includes(channel)) {
+      throw new z.errors.Error(
+        `Vonage couldn't send on ${channel} from "${from}". This usually means that sender isn't registered for ${channel} on your Vonage account — pick a registered sender from the dropdown, or set it up in the Vonage dashboard first. (Vonage said: ${detail})`
+      );
+    }
+    throw new z.errors.Error(`Messages API error: ${detail}`);
   }
 
   return response.json;
@@ -125,7 +120,9 @@ module.exports = {
         label: 'From',
         type: 'string',
         required: true,
-        helpText: 'Your Vonage number, WhatsApp Business number, or sender ID.',
+        dynamic: 'list_senders.id.label',
+        helpText:
+          'Pick a registered sender, or type a Vonage number, WhatsApp Business number, or sender ID.',
       },
       // Text
       {
