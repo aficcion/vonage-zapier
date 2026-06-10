@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1545" height="784" viewBox="0 0 1545 784" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0d1224"/>
+      <stop offset="1" stop-color="#161d3a"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M0,0 L10,6 L0,12 Z" fill="#7c8bdc"/>
+    </marker>
+  </defs>
+
+  <rect width="1545" height="784" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="772" y="78" text-anchor="middle" fill="#ffffff" font-size="46" font-weight="700">Vonage Connector for Zapier</text>
+  <text x="772" y="120" text-anchor="middle" fill="#8ea0ff" font-size="26" font-weight="400">v1.1 &#8212; how it is built</text>
+
+  <!-- User -->
+  <rect x="70" y="320" width="190" height="120" rx="14" fill="#1f2747" stroke="#3a4builder" />
+  <rect x="70" y="320" width="190" height="120" rx="14" fill="#1f2747" stroke="#46518f" stroke-width="2"/>
+  <text x="165" y="372" text-anchor="middle" fill="#ffffff" font-size="24" font-weight="700">Your Zap</text>
+  <text x="165" y="402" text-anchor="middle" fill="#aab4e6" font-size="16">describes what</text>
+  <text x="165" y="422" text-anchor="middle" fill="#aab4e6" font-size="16">&amp; which channel</text>
+
+  <!-- Zapier -->
+  <rect x="330" y="320" width="190" height="120" rx="14" fill="#2a2140" stroke="#ff4f00" stroke-width="2"/>
+  <text x="425" y="372" text-anchor="middle" fill="#ffffff" font-size="24" font-weight="700">Zapier</text>
+  <text x="425" y="402" text-anchor="middle" fill="#ffb38a" font-size="16">triggers &amp;</text>
+  <text x="425" y="422" text-anchor="middle" fill="#ffb38a" font-size="16">actions</text>
+
+  <!-- Connector box (big) -->
+  <rect x="590" y="190" width="430" height="404" rx="18" fill="#15294a" stroke="#34c3ff" stroke-width="2.5"/>
+  <text x="805" y="232" text-anchor="middle" fill="#ffffff" font-size="26" font-weight="700">Vonage Connector v1.1</text>
+
+  <rect x="620" y="258" width="370" height="74" rx="10" fill="#10355e" stroke="#34c3ff" stroke-width="1.5"/>
+  <text x="805" y="286" text-anchor="middle" fill="#9fe3ff" font-size="19" font-weight="700">Session Auth</text>
+  <text x="805" y="312" text-anchor="middle" fill="#cfeeff" font-size="15">API key + secret &#8594; managed app + RSA key</text>
+
+  <rect x="620" y="344" width="370" height="74" rx="10" fill="#10355e" stroke="#34c3ff" stroke-width="1.5"/>
+  <text x="805" y="372" text-anchor="middle" fill="#9fe3ff" font-size="19" font-weight="700">JWT Middleware</text>
+  <text x="805" y="398" text-anchor="middle" fill="#cfeeff" font-size="15">signs every request &#183; self-heals on 401</text>
+
+  <rect x="620" y="430" width="370" height="74" rx="10" fill="#10355e" stroke="#34c3ff" stroke-width="1.5"/>
+  <text x="805" y="458" text-anchor="middle" fill="#9fe3ff" font-size="19" font-weight="700">Actions &#183; Triggers &#183; Search</text>
+  <text x="805" y="484" text-anchor="middle" fill="#cfeeff" font-size="15">From dropdowns &#183; warn-don't-clobber</text>
+
+  <text x="805" y="546" text-anchor="middle" fill="#7fd8ff" font-size="15">managed Vonage application (invisible to the user)</text>
+
+  <!-- Vonage APIs -->
+  <rect x="1090" y="260" width="200" height="120" rx="14" fill="#231a2e" stroke="#c850ff" stroke-width="2"/>
+  <text x="1190" y="308" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">Vonage APIs</text>
+  <text x="1190" y="338" text-anchor="middle" fill="#e3bfff" font-size="15">Messages &#183; Voice</text>
+  <text x="1190" y="360" text-anchor="middle" fill="#e3bfff" font-size="15">Verify &#183; Insight</text>
+
+  <!-- Channels -->
+  <rect x="1090" y="410" width="200" height="170" rx="14" fill="#11302a" stroke="#22c98a" stroke-width="2"/>
+  <text x="1190" y="450" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">Channels</text>
+  <text x="1190" y="484" text-anchor="middle" fill="#9af0c9" font-size="16">SMS</text>
+  <text x="1190" y="510" text-anchor="middle" fill="#9af0c9" font-size="16">RCS</text>
+  <text x="1190" y="536" text-anchor="middle" fill="#9af0c9" font-size="16">WhatsApp &#183; Voice</text>
+  <text x="1190" y="562" text-anchor="middle" fill="#9af0c9" font-size="16">2FA Verify</text>
+
+  <!-- Arrows -->
+  <line x1="262" y1="380" x2="326" y2="380" stroke="#7c8bdc" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="522" y1="380" x2="586" y2="380" stroke="#7c8bdc" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="1022" y1="340" x2="1086" y2="320" stroke="#7c8bdc" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="1190" y1="382" x2="1190" y2="406" stroke="#7c8bdc" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <text x="772" y="700" text-anchor="middle" fill="#6f7bb5" font-size="17">Connection = API key + secret only &#183; the app, the JWT and the webhooks are automatic</text>
+</svg>

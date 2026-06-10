@@ -8,6 +8,10 @@ request and **where** events are delivered.
 > Everything below is validated end-to-end in the real Zapier editor. Test
 > handset: `+34622293256`.
 
+🎬 **Narrated video walkthrough:** [`demo/vonage-connector-demo.mp4`](demo/vonage-connector-demo.mp4)
+— architecture intro + all four clips with an English voiceover (~91s). Rebuild
+it any time with [`demo/build_video.sh`](demo/build_video.sh).
+
 ---
 
 ## In 30 seconds
