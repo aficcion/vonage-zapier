@@ -147,6 +147,18 @@ describe('send_message', () => {
     expect(tplFields).toContain('templateName');
   });
 
+  test('RCS offers the Rich Card type with its fields; other channels do not', () => {
+    const dynFns = App.creates.send_message.operation.inputFields.filter(
+      (f) => typeof f === 'function'
+    );
+    const mtForRcs = dynFns[0](null, { inputData: { channel: 'rcs' } });
+    expect(mtForRcs.choices).toContain('card');
+    const mtForWa = dynFns[0](null, { inputData: { channel: 'whatsapp' } });
+    expect(mtForWa.choices).not.toContain('card');
+    const cardFields = dynFns[1](null, { inputData: { channel: 'rcs', messageType: 'card' } }).map((f) => f.key);
+    expect(cardFields).toEqual(['cardMediaUrl', 'cardTitle', 'cardText', 'cardMediaHeight', 'cardButtons']);
+  });
+
   test('image caption only appears on channels that support it', () => {
     const dynFns = App.creates.send_message.operation.inputFields.filter(
       (f) => typeof f === 'function'
