@@ -15,8 +15,8 @@ const CAPTION_CHANNELS = ['whatsapp', 'mms', 'messenger', 'viber_service'];
 const buildMessagePayload = (inputData) => {
   const { channel, messageType, to, from, text, imageUrl, imageCaption,
     audioUrl, videoUrl, fileUrl, templateName, templateLanguage,
-    templateComponents, cardMediaUrl, cardTitle, cardText, cardMediaHeight,
-    cardButtons } = inputData;
+    templateComponents, cardMediaUrl, cardTitle, cardText,
+    cardMediaHeight } = inputData;
 
   const base = {
     channel,
@@ -61,7 +61,7 @@ const buildMessagePayload = (inputData) => {
     };
     if (cardTitle) card.title = cardTitle;
     if (cardText) card.text = cardText;
-    const suggestions = buildSuggestions(cardButtons);
+    const suggestions = buildSuggestions(inputData);
     if (suggestions.length) card.suggestions = suggestions;
     return { ...base, card, rcs: { card_orientation: 'VERTICAL' } };
   }
@@ -69,34 +69,28 @@ const buildMessagePayload = (inputData) => {
   return base;
 };
 
-// Turn the repeatable "Buttons" line items into RCS suggestion chips (max 4).
-// reply -> {type,text,postback_data}; open_url adds url/description; dial adds
-// phone_number (must keep its leading +) and an optional fallback_url.
-const buildSuggestions = (cardButtons) => {
-  const items = Array.isArray(cardButtons)
-    ? cardButtons
-    : cardButtons
-    ? [cardButtons]
-    : [];
-  return items
-    .filter((b) => b && b.buttonText)
-    .slice(0, 4)
-    .map((b) => {
-      const type = b.buttonType || 'reply';
-      const chip = {
-        type,
-        text: b.buttonText,
-        postback_data: b.postbackData || b.buttonText,
-      };
-      if (type === 'open_url') {
-        chip.url = b.url;
-        if (b.urlDescription) chip.description = b.urlDescription;
-      } else if (type === 'dial') {
-        chip.phone_number = b.phoneNumber; // keep the + (E.164)
-        if (b.fallbackUrl) chip.fallback_url = b.fallbackUrl;
-      }
-      return chip;
-    });
+// Build RCS suggestion chips from the flat per-button fields (btn1*..btn4*),
+// up to the chosen Number of Buttons. reply -> {type,text,postback_data};
+// open_url adds url/description; dial adds phone_number (keeps its +) and an
+// optional fallback_url.
+const buildSuggestions = (inputData) => {
+  const count = parseInt(inputData.cardButtonCount, 10) || 0;
+  const chips = [];
+  for (let i = 1; i <= Math.min(count, 4); i += 1) {
+    const text = inputData[`btn${i}Text`];
+    if (!text) continue;
+    const type = inputData[`btn${i}Type`] || 'reply';
+    const chip = { type, text, postback_data: inputData[`btn${i}Postback`] || text };
+    if (type === 'open_url') {
+      chip.url = inputData[`btn${i}Url`];
+      if (inputData[`btn${i}UrlDesc`]) chip.description = inputData[`btn${i}UrlDesc`];
+    } else if (type === 'dial') {
+      chip.phone_number = inputData[`btn${i}Phone`]; // keep the + (E.164)
+      if (inputData[`btn${i}Fallback`]) chip.fallback_url = inputData[`btn${i}Fallback`];
+    }
+    chips.push(chip);
+  }
+  return chips;
 };
 
 const perform = async (z, bundle) => {
@@ -179,24 +173,20 @@ const CONTENT_FIELDS = {
     { key: 'cardTitle', label: 'Card Title', type: 'string', required: false, helpText: 'Up to 200 characters.' },
     { key: 'cardText', label: 'Card Description', type: 'text', required: false, helpText: 'Up to 2000 characters.' },
     { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'] },
-    {
-      key: 'cardButtons',
-      label: 'Buttons',
-      required: false,
-      list: true,
-      helpText: 'Up to 4 tappable buttons (extra ones are dropped). Use "Add" to add more.',
-      children: [
-        { key: 'buttonType', label: 'Button Type', type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
-        { key: 'buttonText', label: 'Button Text', type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
-        { key: 'postbackData', label: 'Postback Data', type: 'string', required: true, helpText: 'Identifier returned to your inbound trigger when the button is tapped.' },
-        { key: 'url', label: 'Link (open_url only)', type: 'string', helpText: 'Web page to open. Only used when Button Type = open_url.' },
-        { key: 'urlDescription', label: 'Link Description (open_url only)', type: 'string' },
-        { key: 'phoneNumber', label: 'Phone Number (dial only)', type: 'string', helpText: 'Number to call in E.164 format, with + (e.g. +44…). Only when Button Type = dial.' },
-        { key: 'fallbackUrl', label: 'Fallback URL (optional)', type: 'string', helpText: "Web page to open if the device can't place the call." },
-      ],
-    },
+    { key: 'cardButtonCount', label: 'Number of Buttons', type: 'integer', required: false, default: '0', choices: ['0', '1', '2', '3', '4'], altersDynamicFields: true, helpText: 'RCS cards support up to 4 tappable buttons. Pick how many, then fill them in below.' },
   ],
 };
+
+// The per-button fields, generated for buttons 1..N (N = Number of Buttons).
+const buttonFieldsFor = (i) => [
+  { key: `btn${i}Type`, label: `Button ${i} — Type`, type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
+  { key: `btn${i}Text`, label: `Button ${i} — Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
+  { key: `btn${i}Postback`, label: `Button ${i} — Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
+  { key: `btn${i}Url`, label: `Button ${i} — Link (open_url)`, type: 'string', helpText: 'Web page to open. Only for Type = open_url.' },
+  { key: `btn${i}UrlDesc`, label: `Button ${i} — Link Description (open_url)`, type: 'string' },
+  { key: `btn${i}Phone`, label: `Button ${i} — Phone Number (dial)`, type: 'string', helpText: 'Number to call in E.164 with + (e.g. +44…). Only for Type = dial.' },
+  { key: `btn${i}Fallback`, label: `Button ${i} — Fallback URL (optional)`, type: 'string', helpText: "Web page to open if the device can't place the call." },
+];
 
 // Message Type field, with choices limited to what the chosen channel supports.
 const messageTypeField = (z, bundle) => {
@@ -225,6 +215,13 @@ const contentFields = (z, bundle) => {
     return CAPTION_CHANNELS.includes(channel)
       ? [IMAGE_URL_FIELD, IMAGE_CAPTION_FIELD]
       : [IMAGE_URL_FIELD];
+  }
+  // Rich Card: base fields + one block of fields per requested button.
+  if (type === 'card') {
+    const count = parseInt(bundle.inputData.cardButtonCount, 10) || 0;
+    const fields = [...CONTENT_FIELDS.card];
+    for (let i = 1; i <= Math.min(count, 4); i += 1) fields.push(...buttonFieldsFor(i));
+    return fields;
   }
   return CONTENT_FIELDS[type] || CONTENT_FIELDS.text;
 };
