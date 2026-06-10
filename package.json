@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "jest --testPathPattern=test",
-    "validate": "zapier validate",
-    "push": "zapier push",
-    "deploy": "zapier push && zapier promote"
+    "validate": "zapier-platform validate",
+    "push": "zapier-platform push",
+    "deploy": "zapier-platform push && zapier-platform promote"
   },
   "dependencies": {
     "jsonwebtoken": "^9.0.2",
