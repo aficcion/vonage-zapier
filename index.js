@@ -12,6 +12,8 @@ const inboundCall = require('./triggers/inbound_call');
 const callStatus = require('./triggers/call_status');
 const messageStatus = require('./triggers/message_status');
 const verifyEvent = require('./triggers/verify_event');
+const listNumbers = require('./triggers/list_numbers');
+const listSenders = require('./triggers/list_senders');
 
 // Creates (Actions)
 const sendSms = require('./creates/send_sms');
@@ -45,6 +47,8 @@ module.exports = {
     [callStatus.key]: callStatus,
     [messageStatus.key]: messageStatus,
     [verifyEvent.key]: verifyEvent,
+    [listNumbers.key]: listNumbers,
+    [listSenders.key]: listSenders,
   },
 
   creates: {

@@ -101,7 +101,9 @@ module.exports = {
         label: 'From (Virtual Number)',
         type: 'string',
         required: true,
-        helpText: 'Your Vonage virtual number in E.164 format.',
+        dynamic: 'list_numbers.id.label',
+        helpText:
+          'Pick one of your Vonage numbers, or type a virtual number in E.164 format.',
       },
       {
         key: 'answerUrl',
