@@ -1,6 +1,6 @@
 'use strict';
 
-const { makeAppWebhookHooks } = require('../app_webhooks');
+const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'messages',
@@ -61,6 +61,7 @@ module.exports = {
     performUnsubscribe: unsubscribeHook,
     perform: getInboundMessage,
     performList,
+    inputFields: [takeOverField],
     sample: {
       messageUuid: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',
       from: '15559876543',

@@ -16,7 +16,7 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const { makeAppWebhookHooks } = require('../app_webhooks');
+const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'voice',
@@ -88,6 +88,7 @@ module.exports = {
         default: 'completed,failed',
         helpText: 'Select which call statuses trigger this Zap. Defaults to final statuses.',
       },
+      takeOverField,
     ],
     sample: {
       uuid: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',

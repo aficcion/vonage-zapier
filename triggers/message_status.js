@@ -13,7 +13,7 @@ const performList = async (z, bundle) => {
   ];
 };
 
-const { makeAppWebhookHooks } = require('../app_webhooks');
+const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'messages',
@@ -83,6 +83,7 @@ module.exports = {
         default: 'delivered,failed',
         helpText: 'Select which message statuses trigger this Zap.',
       },
+      takeOverField,
     ],
     sample: {
       messageUuid: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',
