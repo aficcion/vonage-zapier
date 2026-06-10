@@ -135,7 +135,17 @@ Developer ToS de Zapier (zapier.com/app/developer) para poder promocionar
    ✅ Criterio: conexión solo con key/secret; Send SMS + Make Call E2E en editor
    real; romper la clave a mano y ver al conector curarse solo.
 
-### Sesión 2 — El envío ideal
+### Sesión 2 — El envío ideal — ✅ HECHA (10-jun-2026)
+
+Validada E2E en editor real con v1.1.0: desplegable dinámico de From (carga los
+5 números reales vía list_numbers; selección persistida), Send SMS migrado a
+Messages API (devuelve message_uuid). **Hallazgo clave**: el JWT de la app
+gestionada firma SMS desde CUALQUIER remitente (número libre, número de OTRA
+app del usuario, e incluso alfanumérico arbitrario → todos 202). La lección
+"Messages API exige el JWT de la app vinculada al sender" solo aplica a los
+canales de chat (WhatsApp/RCS), no a SMS → SMS/Voz no necesitan resolución de
+custodia; para canales de chat se traduce a lenguaje de producto el error de
+sender-no-registrado (cesión opt-in queda para fase posterior).
 1. **Desplegables dinámicos de From**: triggers ocultos que listan números
    (`GET /account/numbers`) y senders (`GET /beta/chatapp-accounts` — beta) por
    canal; `dynamic` en el campo From de cada acción (texto libre como fallback).
