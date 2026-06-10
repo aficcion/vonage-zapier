@@ -183,7 +183,8 @@ const CONTENT_FIELDS = {
       key: 'cardButtons',
       label: 'Buttons',
       required: false,
-      helpText: 'Up to 4 tappable buttons (extra ones are dropped).',
+      list: true,
+      helpText: 'Up to 4 tappable buttons (extra ones are dropped). Use "Add" to add more.',
       children: [
         { key: 'buttonType', label: 'Button Type', type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
         { key: 'buttonText', label: 'Button Text', type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
