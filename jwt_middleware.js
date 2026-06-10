@@ -24,7 +24,15 @@ const addJwtToBundle = async (request, z, bundle) => {
     };
 
     const privateKey = bundle.authData.privateKey.replace(/\\n/g, '\n');
-    bundle.authData._jwt = jwt.sign(payload, privateKey, { algorithm: 'RS256' });
+    const token = jwt.sign(payload, privateKey, { algorithm: 'RS256' });
+    bundle.authData._jwt = token;
+
+    // Performs interpolate `Bearer ${bundle.authData._jwt}` BEFORE this middleware
+    // runs, so on the first request of an invocation the header arrives here as
+    // the literal string "Bearer undefined". Patch the request directly.
+    if (request.headers && request.headers.Authorization === 'Bearer undefined') {
+      request.headers.Authorization = `Bearer ${token}`;
+    }
   } catch (err) {
     z.console.log('JWT generation skipped:', err.message);
   }
