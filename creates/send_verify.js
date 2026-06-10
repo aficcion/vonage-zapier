@@ -27,8 +27,7 @@ const perform = async (z, bundle) => {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    username: bundle.authData.apiKey,
-    password: bundle.authData.apiSecret,
+    auth: [bundle.authData.apiKey, bundle.authData.apiSecret],
     body,
   });
 

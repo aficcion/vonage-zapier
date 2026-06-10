@@ -5,8 +5,7 @@ const perform = async (z, bundle) => {
     url: `https://api.nexmo.com/v2/verify/${bundle.inputData.requestId}/cancel`,
     method: 'DELETE',
     headers: { Accept: 'application/json' },
-    username: bundle.authData.apiKey,
-    password: bundle.authData.apiSecret,
+    auth: [bundle.authData.apiKey, bundle.authData.apiSecret],
   });
 
   if (response.status === 204) {

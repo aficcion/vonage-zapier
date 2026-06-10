@@ -75,8 +75,7 @@ const perform = async (z, bundle) => {
     ...(config.requiresApp
       ? {}
       : {
-          username: bundle.authData.apiKey,
-          password: bundle.authData.apiSecret,
+          auth: [bundle.authData.apiKey, bundle.authData.apiSecret],
         }),
   });
 
