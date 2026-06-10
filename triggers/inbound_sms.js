@@ -62,11 +62,13 @@ const getInboundSms = (z, bundle) => {
   );
   return [
     {
-      msisdn: payload.msisdn,
+      // Sender: `msisdn` in classic SMS API format, `from` in Messages API
+      // format — which one arrives depends on the account's webhook setting.
+      msisdn: payload.msisdn || payload.from,
       to: payload.to,
-      messageId: payload['messageId'] || payload['message-id'],
+      messageId: payload['messageId'] || payload['message-id'] || payload.message_uuid,
       text: payload.text,
-      type: payload.type || 'text',
+      type: payload.type || payload.message_type || 'text',
       keyword: payload.keyword || '',
       timestamp: payload['message-timestamp'] || payload.timestamp || new Date().toISOString(),
       networkCode: payload['network-code'] || '',
