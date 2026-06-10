@@ -37,7 +37,11 @@ const getVerifyEvent = (z, bundle) => {
     'failed',
   ]);
 
-  if (!watchedTypes.includes(payload.type)) return [];
+  // Verify v2 callbacks carry the outcome in `status` ('completed', 'failed',
+  // 'expired', ...) while `type` distinguishes the callback kind ('summary' /
+  // 'event'). Match on the outcome, falling back to `type` for older shapes.
+  const outcome = String(payload.status || payload.type || '').toLowerCase();
+  if (!watchedTypes.includes(outcome)) return [];
 
   return [
     {
