@@ -86,6 +86,68 @@ const perform = async (z, bundle) => {
   return response.json;
 };
 
+// --- Dynamic fields ---------------------------------------------------------
+// Which message types each channel actually supports.
+const TYPES_BY_CHANNEL = {
+  sms: ['text'],
+  whatsapp: ['text', 'image', 'audio', 'video', 'file', 'template'],
+  mms: ['image', 'audio', 'video', 'file'],
+  viber_service: ['text', 'image', 'video', 'file'],
+  messenger: ['text', 'image', 'audio', 'video', 'file'],
+  rcs: ['text', 'image', 'video', 'file'],
+};
+const ALL_TYPES = ['text', 'image', 'audio', 'video', 'file', 'template'];
+
+// Content fields, one set per message type — only the relevant ones are shown.
+const CONTENT_FIELDS = {
+  text: [
+    { key: 'text', label: 'Text', type: 'text', required: true, helpText: 'Message body.' },
+  ],
+  image: [
+    { key: 'imageUrl', label: 'Image URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the image.' },
+    { key: 'imageCaption', label: 'Image Caption', type: 'string', required: false },
+  ],
+  audio: [
+    { key: 'audioUrl', label: 'Audio URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the audio file.' },
+  ],
+  video: [
+    { key: 'videoUrl', label: 'Video URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the video file.' },
+  ],
+  file: [
+    { key: 'fileUrl', label: 'File URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the file.' },
+  ],
+  template: [
+    { key: 'templateName', label: 'Template Name', type: 'string', required: true, helpText: 'WhatsApp approved template name.' },
+    { key: 'templateLanguage', label: 'Template Language Code', type: 'string', required: false, default: 'en_US' },
+    { key: 'templateComponents', label: 'Template Components (JSON)', type: 'text', required: false, helpText: 'JSON array of WhatsApp template components (header, body, buttons).' },
+  ],
+};
+
+// Message Type field, with choices limited to what the chosen channel supports.
+const messageTypeField = (z, bundle) => {
+  const channel = bundle.inputData.channel;
+  const choices = TYPES_BY_CHANNEL[channel] || ALL_TYPES;
+  return {
+    key: 'messageType',
+    label: 'Message Type',
+    type: 'string',
+    required: true,
+    choices,
+    default: choices[0],
+    altersDynamicFields: true,
+  };
+};
+
+// Only the content fields tied to the selected message type.
+const contentFields = (z, bundle) => {
+  const channel = bundle.inputData.channel;
+  const mt = bundle.inputData.messageType;
+  // Fall back to the channel's first/only type so text-only channels (SMS)
+  // still show their field before the user touches Message Type.
+  const type = mt || (TYPES_BY_CHANNEL[channel] || ALL_TYPES)[0];
+  return CONTENT_FIELDS[type] || CONTENT_FIELDS.text;
+};
+
 module.exports = {
   key: 'send_message',
   noun: 'Message',
@@ -113,15 +175,8 @@ module.exports = {
         choices: ['sms', 'whatsapp', 'mms', 'viber_service', 'messenger', 'rcs'],
         altersDynamicFields: true,
       },
-      {
-        key: 'messageType',
-        label: 'Message Type',
-        type: 'string',
-        required: true,
-        choices: ['text', 'image', 'audio', 'video', 'file', 'template'],
-        altersDynamicFields: true,
-        default: 'text',
-      },
+      // Message Type — choices depend on the chosen channel.
+      messageTypeField,
       {
         key: 'to',
         label: 'To',
@@ -138,74 +193,8 @@ module.exports = {
         helpText:
           'Pick a registered sender, or type a Vonage number, WhatsApp Business number, or sender ID.',
       },
-      // Text
-      {
-        key: 'text',
-        label: 'Text',
-        type: 'text',
-        required: false,
-        helpText: 'Message body. Required when Message Type is "text".',
-      },
-      // Image
-      {
-        key: 'imageUrl',
-        label: 'Image URL',
-        type: 'string',
-        required: false,
-        helpText: 'Publicly accessible URL of the image. Required for "image" type.',
-      },
-      {
-        key: 'imageCaption',
-        label: 'Image Caption',
-        type: 'string',
-        required: false,
-      },
-      // Audio
-      {
-        key: 'audioUrl',
-        label: 'Audio URL',
-        type: 'string',
-        required: false,
-        helpText: 'Publicly accessible URL of the audio file. Required for "audio" type.',
-      },
-      // Video
-      {
-        key: 'videoUrl',
-        label: 'Video URL',
-        type: 'string',
-        required: false,
-        helpText: 'Publicly accessible URL of the video file. Required for "video" type.',
-      },
-      // File
-      {
-        key: 'fileUrl',
-        label: 'File URL',
-        type: 'string',
-        required: false,
-        helpText: 'Publicly accessible URL of the file. Required for "file" type.',
-      },
-      // Template
-      {
-        key: 'templateName',
-        label: 'Template Name',
-        type: 'string',
-        required: false,
-        helpText: 'WhatsApp approved template name.',
-      },
-      {
-        key: 'templateLanguage',
-        label: 'Template Language Code',
-        type: 'string',
-        required: false,
-        default: 'en_US',
-      },
-      {
-        key: 'templateComponents',
-        label: 'Template Components (JSON)',
-        type: 'text',
-        required: false,
-        helpText: 'JSON array of WhatsApp template components (header, body, buttons).',
-      },
+      // Content fields — only those tied to the selected message type.
+      contentFields,
       {
         key: 'sandbox',
         label: 'Sandbox Mode',
