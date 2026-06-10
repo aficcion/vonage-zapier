@@ -18,17 +18,48 @@ const performList = async (z, bundle) => {
   ];
 };
 
+// Vonage has no per-subscription webhook API for account-level inbound SMS;
+// the single moCallBackUrl on Account Settings is the registration point.
+// Subscribing overwrites it with Zapier's hook URL (and returns the previous
+// value so a future enhancement could restore it on unsubscribe).
+const setAccountInboundUrl = async (z, bundle, url) => {
+  const response = await z.request({
+    url: 'https://rest.nexmo.com/account/settings',
+    method: 'POST',
+    params: {
+      api_key: bundle.authData.apiKey,
+      api_secret: bundle.authData.apiSecret,
+      moCallBackUrl: url,
+    },
+  });
+
+  if (response.status >= 400) {
+    throw new z.errors.Error(
+      `Could not update Vonage inbound webhook: HTTP ${response.status}`
+    );
+  }
+
+  return response.json;
+};
+
 const subscribeHook = async (z, bundle) => {
-  // Store the Zapier webhook URL so the user knows where to point Vonage
-  return { webhookUrl: bundle.targetUrl };
+  const settings = await setAccountInboundUrl(z, bundle, bundle.targetUrl);
+  return { webhookUrl: bundle.targetUrl, previousUrl: settings['mo-callback-url'] || '' };
 };
 
 const unsubscribeHook = async (z, bundle) => {
+  await setAccountInboundUrl(z, bundle, '');
   return {};
 };
 
 const getInboundSms = (z, bundle) => {
-  const payload = bundle.cleanedRequest;
+  // Vonage may deliver inbound SMS as GET (query params) or POST (body)
+  // depending on the account's webhook format setting — accept both.
+  const payload = Object.assign(
+    {},
+    bundle.cleanedRequest,
+    bundle.cleanedRequest.querystring
+  );
   return [
     {
       msisdn: payload.msisdn,
@@ -55,9 +86,7 @@ module.exports = {
   display: {
     label: 'New Inbound SMS',
     description:
-      'Triggers when a new SMS is received on your Vonage virtual number. Point your Vonage inbound webhook at the URL Zapier provides.',
-    directions:
-      '1. Enable this trigger to get a Zapier webhook URL.\n2. Go to your [Vonage Dashboard → API Settings](https://dashboard.nexmo.com/settings) and set the **Inbound Messages Webhook URL** to the Zapier webhook URL shown above.\n3. Send a test SMS to your Vonage number to verify.',
+      'Triggers when a new SMS is received on your Vonage virtual number. Turning the Zap on registers the webhook in your Vonage account automatically (numbers not linked to a Vonage Application use the account-level inbound URL).',
   },
   operation: {
     type: 'hook',
