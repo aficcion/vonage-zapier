@@ -4,3 +4,9 @@ node_modules/
 *.key
 build/
 .zapierapprc
+
+# Demo media — kept in git history but excluded from the Zapier build (size)
+docs/demo/*.gif
+docs/demo/*.mp4
+docs/demo/*.png
+docs/demo/voice-samples/
