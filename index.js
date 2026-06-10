@@ -3,7 +3,7 @@
 const { version } = require('zapier-platform-core');
 
 const authentication = require('./authentication');
-const { addJwtToBundle } = require('./jwt_middleware');
+const { addJwtToBundle, refreshOnInvalidJwt } = require('./jwt_middleware');
 
 // Triggers
 const inboundSms = require('./triggers/inbound_sms');
@@ -31,6 +31,8 @@ module.exports = {
   authentication,
 
   beforeRequest: [addJwtToBundle],
+
+  afterResponse: [refreshOnInvalidJwt],
 
   flags: {
     cleanInputData: false,

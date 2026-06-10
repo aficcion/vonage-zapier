@@ -1,6 +1,6 @@
 {
   "name": "vonage-zapier",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zapier integration for Vonage APIs — SMS, Messages, Voice, Verify, Number Insight",
   "main": "index.js",
   "scripts": {
