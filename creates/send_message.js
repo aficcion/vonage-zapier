@@ -8,6 +8,10 @@ const { normalizePhone } = require('../phone');
 // translated into product language.
 const CHAT_CHANNELS = ['whatsapp', 'mms', 'viber_service', 'messenger', 'rcs'];
 
+// Channels that accept a caption alongside an image. RCS does not — sending one
+// returns 422 "image.caption is not supported for the given channel".
+const CAPTION_CHANNELS = ['whatsapp', 'mms', 'messenger', 'viber_service'];
+
 const buildMessagePayload = (inputData) => {
   const { channel, messageType, to, from, text, imageUrl, imageCaption,
     audioUrl, videoUrl, fileUrl, templateName, templateLanguage,
@@ -24,7 +28,12 @@ const buildMessagePayload = (inputData) => {
   if (messageType === 'text') return { ...base, text };
 
   if (messageType === 'image') {
-    return { ...base, image: { url: imageUrl, caption: imageCaption || undefined } };
+    const image = { url: imageUrl };
+    // Only attach a caption on channels that support it (RCS rejects it).
+    if (imageCaption && CAPTION_CHANNELS.includes(channel)) {
+      image.caption = imageCaption;
+    }
+    return { ...base, image };
   }
 
   if (messageType === 'audio') return { ...base, audio: { url: audioUrl } };
@@ -99,14 +108,14 @@ const TYPES_BY_CHANNEL = {
 const ALL_TYPES = ['text', 'image', 'audio', 'video', 'file', 'template'];
 
 // Content fields, one set per message type — only the relevant ones are shown.
+const IMAGE_URL_FIELD = { key: 'imageUrl', label: 'Image URL', type: 'string', required: true, helpText: 'Direct URL of the image file (must end in .jpg/.png and return an image, not a web page).' };
+const IMAGE_CAPTION_FIELD = { key: 'imageCaption', label: 'Image Caption', type: 'string', required: false };
+
 const CONTENT_FIELDS = {
   text: [
     { key: 'text', label: 'Text', type: 'text', required: true, helpText: 'Message body.' },
   ],
-  image: [
-    { key: 'imageUrl', label: 'Image URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the image.' },
-    { key: 'imageCaption', label: 'Image Caption', type: 'string', required: false },
-  ],
+  image: [IMAGE_URL_FIELD, IMAGE_CAPTION_FIELD],
   audio: [
     { key: 'audioUrl', label: 'Audio URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the audio file.' },
   ],
@@ -145,6 +154,12 @@ const contentFields = (z, bundle) => {
   // Fall back to the channel's first/only type so text-only channels (SMS)
   // still show their field before the user touches Message Type.
   const type = mt || (TYPES_BY_CHANNEL[channel] || ALL_TYPES)[0];
+  // Image caption only shows on channels that accept it (not RCS).
+  if (type === 'image') {
+    return CAPTION_CHANNELS.includes(channel)
+      ? [IMAGE_URL_FIELD, IMAGE_CAPTION_FIELD]
+      : [IMAGE_URL_FIELD];
+  }
   return CONTENT_FIELDS[type] || CONTENT_FIELDS.text;
 };
 

@@ -141,10 +141,21 @@ describe('send_message', () => {
     const contentFn = dynFns[1];
     const textFields = contentFn(null, { inputData: { messageType: 'text' } }).map((f) => f.key);
     expect(textFields).toEqual(['text']);
-    const imgFields = contentFn(null, { inputData: { messageType: 'image' } }).map((f) => f.key);
+    const imgFields = contentFn(null, { inputData: { channel: 'whatsapp', messageType: 'image' } }).map((f) => f.key);
     expect(imgFields).toEqual(['imageUrl', 'imageCaption']);
     const tplFields = contentFn(null, { inputData: { messageType: 'template' } }).map((f) => f.key);
     expect(tplFields).toContain('templateName');
+  });
+
+  test('image caption only appears on channels that support it', () => {
+    const dynFns = App.creates.send_message.operation.inputFields.filter(
+      (f) => typeof f === 'function'
+    );
+    const contentFn = dynFns[1];
+    const rcsImg = contentFn(null, { inputData: { channel: 'rcs', messageType: 'image' } }).map((f) => f.key);
+    expect(rcsImg).toEqual(['imageUrl']); // no caption on RCS
+    const waImg = contentFn(null, { inputData: { channel: 'whatsapp', messageType: 'image' } }).map((f) => f.key);
+    expect(waImg).toContain('imageCaption');
   });
 });
 
