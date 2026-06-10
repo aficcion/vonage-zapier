@@ -157,7 +157,17 @@ sender-no-registrado (cesión opt-in queda para fase posterior).
 4. ⚠️ Verificar PRIMERO la incógnita: ¿acepta Messages API el JWT de la app
    gestionada para un remitente NO vinculado? Si no → Basic para libres.
 
-### Sesión 3 — La recepción ideal y los bordes
+### Sesión 3 — La recepción ideal y los bordes — ✅ HECHA (10-jun-2026)
+
+Implementada y verificada con v1.1.0: (1) trigger nuevo `delivery_receipt`
+(drCallBackUrl a nivel cuenta) — confirmado en editor real que aparece en la
+lista. (2) "Avisar, no pisar": helper `isForeignUrl` + campo `takeOver` en los
+7 triggers de webhook; `app_webhooks`/`account_settings` se niegan a pisar una
+URL ajena sin opt-in y restauran la previa al desuscribir (inbound_sms migrado
+al helper de cuenta). (3) Toggle Sandbox en send_sms/send_message
+(messages-sandbox.nexmo.com) + bloque informativo con enlaces al alta de
+canales de chat. (4) Regresión de los 5 bugs del 10-jun: todos sanos (smoke
+real contra API). **v1.1.0 completa** (pushed; pendiente solo promote tras ToS).
 1. Trigger de **acuses a nivel cuenta** (`drCallBackUrl`).
 2. **"Avisar, no pisar"**: si el hueco de webhook está ocupado por URL ajena, el
    trigger falla con explicación + checkbox "tomar el control mientras este Zap
