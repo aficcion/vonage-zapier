@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizePhone } = require('../phone');
+
 const buildNcco = (inputData) => {
   const actions = [];
 
@@ -28,7 +30,7 @@ const buildNcco = (inputData) => {
   if (inputData.connectTo) {
     actions.push({
       action: 'connect',
-      endpoint: [{ type: 'phone', number: inputData.connectTo }],
+      endpoint: [{ type: 'phone', number: normalizePhone(inputData.connectTo) }],
     });
   }
 
@@ -43,8 +45,8 @@ const perform = async (z, bundle) => {
   }
 
   const body = {
-    to: [{ type: 'phone', number: bundle.inputData.to }],
-    from: { type: 'phone', number: bundle.inputData.from },
+    to: [{ type: 'phone', number: normalizePhone(bundle.inputData.to) }],
+    from: { type: 'phone', number: normalizePhone(bundle.inputData.from) },
     ...(bundle.inputData.answerUrl
       ? { answer_url: [bundle.inputData.answerUrl], answer_method: 'GET' }
       : { ncco: buildNcco(bundle.inputData) }),

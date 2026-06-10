@@ -4,8 +4,12 @@
 // application JWT. The managed JWT is accepted for any sender on the account —
 // linked, unlinked, or alphanumeric — so SMS never needs per-sender custody.
 // The middleware injects the token (see the "Bearer undefined" patch).
+const { normalizePhone } = require('../phone');
+
 const perform = async (z, bundle) => {
-  const { from, to, text, unicode, ttl, sandbox } = bundle.inputData;
+  const { text, unicode, ttl, sandbox } = bundle.inputData;
+  const from = normalizePhone(bundle.inputData.from);
+  const to = normalizePhone(bundle.inputData.to);
 
   const payload = {
     channel: 'sms',

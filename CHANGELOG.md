@@ -6,6 +6,7 @@
 - "From" fields are now dropdowns of your Vonage numbers and registered senders (you can still type a value).
 - Send SMS now goes through the Messages API. Send SMS and Send Message can run against the Vonage sandbox for testing.
 - New trigger: Delivery Receipt Received (account-level). Triggers that register a Vonage webhook now protect a URL another integration set, unless you opt to take it over, and restore the previous URL when the Zap is turned off.
+- Phone numbers are normalized automatically — you can paste them with a leading "+", spaces or dashes and they're cleaned before sending. Alphanumeric sender IDs and emails are left untouched.
 
 ## 1.0.0
 

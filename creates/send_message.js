@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizePhone } = require('../phone');
+
 // Chat channels require the sender to be registered (and linked to an
 // application) on the Vonage side. SMS does not — the managed JWT signs any
 // sender. `isChat` decides whether a sender-not-registered API error gets
@@ -14,8 +16,8 @@ const buildMessagePayload = (inputData) => {
   const base = {
     channel,
     message_type: messageType,
-    to,
-    from,
+    to: normalizePhone(to),
+    from: normalizePhone(from),
     client_ref: 'vonage-zapier',
   };
 

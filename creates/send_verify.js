@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizePhone } = require('../phone');
+
 const perform = async (z, bundle) => {
   const body = {
     brand: bundle.inputData.brand,
@@ -45,7 +47,8 @@ const perform = async (z, bundle) => {
 
 const buildDefaultWorkflow = (inputData) => {
   const channel = inputData.channel || 'sms';
-  const step = { channel, to: inputData.to };
+  // normalizePhone leaves emails untouched (they contain letters).
+  const step = { channel, to: normalizePhone(inputData.to) };
   if (channel === 'email') {
     step.from = inputData.emailFrom;
   }
