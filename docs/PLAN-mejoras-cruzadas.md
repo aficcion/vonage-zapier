@@ -34,6 +34,32 @@ cazados) y auditar el middleware VCR.
 | Multi-app | 1 app por conexión (hoy: 4 conexiones) | App por canal con defaults (`DEFAULT_APPS`) | **PA** |
 | Persistencia | N/A (Zapier gestiona) | VCR State provider (Redis) + rotación de claves 90d | **PA** |
 
+## Modelo de usuario: cuándo hace falta una Application (y cuándo no)
+
+La frontera no es intuitiva (herencia histórica de la plataforma). El modelo
+explicable tiene TRES niveles:
+
+| Nivel | Identidad | Webhooks | Para quién |
+|---|---|---|---|
+| **Cuenta** (Dashboard → API Settings) | API key + secret | 2 huecos globales: Inbound SMS + Status/DLR (`moCallBackUrl`/`drCallBackUrl`, y ahí se elige el FORMATO: SMS API clásico vs Messages API) | SMS clásico y números sin app |
+| **Aplicación** | Par de claves RSA — **solo UNA clave pública por app** | Por capability: messages inbound/status, voice events, verify status | Messages API (WhatsApp/RCS/MMS/Viber), Voice, y todo recurso vinculado |
+| **Recurso** (número / sender WhatsApp / agente RCS) | — | Hereda: vinculado a una app → webhooks de la app; libre → webhooks de cuenta | — |
+
+Reglas y trampas (validadas empíricamente en los PoCs):
+
+- **Una app : N números. Un número : UNA app.** Un sender/agente pertenece a una app.
+- **Regla de enrutado**: el tráfico de un recurso va a los webhooks de su app si la tiene; si no, a los de cuenta.
+- **Usuario solo-SMS nunca necesita app**: envía (SMS API), recibe (inbound de cuenta) y tiene acuses (status de cuenta).
+- **Trampa del vínculo** (hallazgo PoC PA 4-jun): vincular un número/WABA a una app *para recibir* hace que *enviar* desde él pase a EXIGIR JWT — lo que funcionaba con Basic empieza a dar 401.
+- **Una clave pública por app = un solo firmante**: dos herramientas no pueden firmar para la misma app sin pisarse la clave (incidente 10-jun: rotar la clave PA-RCS desde Zapier rompió el VCR).
+- **Los huecos de cuenta son únicos y globales**: si un conector los toma, se los quita a cualquier otro sistema.
+
+**Implicación de producto**: el usuario no debería entender nada de esto. La app es
+detalle de implementación. Recomendaciones de PLATAFORMA para el benchmark:
+(a) varias claves públicas por app (o clave de firma a nivel de cuenta) — elimina
+las guerras de custodia; (b) una "default application" por cuenta — elimina el
+acantilado al pasar de SMS a canales modernos.
+
 ## Plan para PA (`vonage-pa-trigger`) ← lo mejor de Zapier
 
 | Pri | Mejora | Detalle |
@@ -48,9 +74,10 @@ cazados) y auditar el middleware VCR.
 
 | Pri | Mejora | Detalle |
 |---|---|---|
-| **P1** | JWT invisible | Portar `ensure_app_key` del VCR. Vía: cambiar la auth de `custom` a `session`: el usuario mete solo API key/secret + Application ID; el exchange de session auth genera el par RSA, registra la pública en la app (Application API, Basic) y guarda el PEM en `sessionData` (persistente por conexión). Adiós a pegar PEMs. Incluir rotación (90d) re-lanzando el exchange. |
+| **P1** | JWT invisible — con modelo de custodia de 3 niveles | Portar `ensure_app_key` del VCR vía session auth (el usuario mete solo API key/secret; el exchange genera el par RSA, lo registra y guarda el PEM en `sessionData`). PERO la app gestionada solo puede usarse con recursos que el conector pueda poseer: **(1) recurso libre** → vincular a la app gestionada del conector (reversible al desconectar); **(2) recurso vinculado a una app del usuario** → NO tocarlo: detectar el dueño (`app_id` del número / `applications[]` del sender) y dar error útil ("este número pertenece a tu app X — cédela o usa un número gestionado"), nunca el 401 opaco; **(3) cesión opt-in** → el usuario marca "deja que el conector gestione la clave de esta app", con aviso de que cualquier otro firmante de esa app dejará de funcionar (una sola clave pública por app). |
 | **P1** | Auto-curación ante clave inválida | Si un envío JWT devuelve 401 "Invalid Token": regenerar+registrar clave y reintentar UNA vez. Resuelve también el conflicto de hoy: la rotación de la clave PA-RCS desde Zapier dejó rota la clave que guarda el VCR (su `/send` RCS está roto ahora mismo; `ensure_app_key` no se auto-cura porque solo regenera si falta o caduca — aplicar la misma auto-curación allí). |
 | **P2** | `client_ref: "vonage-zapier"` | En todos los envíos (SMS API y Messages API), sobreescribible por campo opcional. Atribución para métricas de producto. |
+| **P2** | Trigger de acuses a nivel CUENTA | Hueco detectado: Message Status solo escucha el nivel app; los DLR de los SMS enviados con Send SMS (API clásica, Basic) caen en el Status webhook de CUENTA (`drCallBackUrl`), hoy sin cubrir. Mismo patrón de auto-suscripción que el inbound SMS de cuenta. Y en ambos huecos de cuenta: si ya hay una URL configurada, AVISAR en vez de pisarla en silencio (son globales y compartidos con otros sistemas del usuario). |
 | **P2** | RCS rico (card/carrusel) | Ampliar Send Message con messageType `card`/`carousel` reutilizando los payloads que el conector PA ya manda (los del swagger `/send/card`, `/send/carousel`). |
 | **P3** | Errores traducidos | Estilo `_verr`: mapear 401/403 → "revisa credenciales/Application ID", extraer `title`/`detail` del problem+json de Vonage en vez de JSON.stringify crudo. |
 
