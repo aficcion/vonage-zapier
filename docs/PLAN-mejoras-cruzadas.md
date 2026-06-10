@@ -112,7 +112,14 @@ resuelve solo QUIÉN firma y A DÓNDE llegan los eventos. Conexión = solo API
 key + secret. La app es un detalle interno: nace cuando hace falta
 (find-or-create "Zapier (managed)"), trabaja en silencio, se cura sola.
 
-### Sesión 1 — La conexión ideal (core)
+### Sesión 1 — La conexión ideal (core) — ✅ HECHA (10-jun-2026)
+
+Validada E2E en el editor real con v1.1.0: conexión nueva solo key/secret,
+Send SMS (Basic) y Make Call (JWT invisible) OK, y auto-curación probada
+rompiendo la clave a mano (clave intrusa por API → retest → el conector se
+recuperó solo y la llamada salió). Pendiente administrativo: aceptar los
+Developer ToS de Zapier (zapier.com/app/developer) para poder promocionar
+1.1.0, y reconectar los Zaps de demo (siguen en 1.0.0 con conexiones custom).
 1. `authentication.js`: de `custom` a **session auth**. Campos: solo apiKey/apiSecret.
    El exchange hace find-or-create de la app gestionada (nombre "Zapier"; la
    `f56f9d40-1f1a-4861-822a-c7a3e0f4edbf` creada el 10-jun ya sirve — REUSAR),
