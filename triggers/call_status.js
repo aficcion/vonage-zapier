@@ -23,12 +23,21 @@ const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'event_url'
 );
 
+// Zapier list fields can deliver defaults as a single comma-joined item
+// (e.g. ['completed,failed']) — split and normalise before matching.
+const normaliseList = (value, fallback) => {
+  const items = (Array.isArray(value) ? value : [value])
+    .filter(Boolean)
+    .flatMap((s) => String(s).split(','))
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  return items.length ? items : fallback;
+};
+
 const getCallStatus = (z, bundle) => {
   const payload = bundle.cleanedRequest;
 
-  const watchedStatuses = bundle.inputData.statuses
-    ? bundle.inputData.statuses
-    : FINAL_STATUSES;
+  const watchedStatuses = normaliseList(bundle.inputData.statuses, FINAL_STATUSES);
 
   if (!watchedStatuses.includes(payload.status)) return [];
 
