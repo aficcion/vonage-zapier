@@ -55,31 +55,48 @@ const buildMessagePayload = (inputData) => {
   }
 
   if (messageType === 'card') {
-    // Zapier list fields can arrive as a single comma-joined string — split and
-    // cap at 4 reply suggestions.
-    const buttons = (Array.isArray(cardButtons) ? cardButtons : [cardButtons])
-      .filter(Boolean)
-      .flatMap((s) => String(s).split(','))
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 4);
     const card = {
       media_url: cardMediaUrl,
       media_height: cardMediaHeight || 'MEDIUM',
     };
     if (cardTitle) card.title = cardTitle;
     if (cardText) card.text = cardText;
-    if (buttons.length) {
-      card.suggestions = buttons.map((t, i) => ({
-        type: 'reply',
-        text: t,
-        postback_data: `btn_${i + 1}`,
-      }));
-    }
+    const suggestions = buildSuggestions(cardButtons);
+    if (suggestions.length) card.suggestions = suggestions;
     return { ...base, card, rcs: { card_orientation: 'VERTICAL' } };
   }
 
   return base;
+};
+
+// Turn the repeatable "Buttons" line items into RCS suggestion chips (max 4).
+// reply -> {type,text,postback_data}; open_url adds url/description; dial adds
+// phone_number (must keep its leading +) and an optional fallback_url.
+const buildSuggestions = (cardButtons) => {
+  const items = Array.isArray(cardButtons)
+    ? cardButtons
+    : cardButtons
+    ? [cardButtons]
+    : [];
+  return items
+    .filter((b) => b && b.buttonText)
+    .slice(0, 4)
+    .map((b) => {
+      const type = b.buttonType || 'reply';
+      const chip = {
+        type,
+        text: b.buttonText,
+        postback_data: b.postbackData || b.buttonText,
+      };
+      if (type === 'open_url') {
+        chip.url = b.url;
+        if (b.urlDescription) chip.description = b.urlDescription;
+      } else if (type === 'dial') {
+        chip.phone_number = b.phoneNumber; // keep the + (E.164)
+        if (b.fallbackUrl) chip.fallback_url = b.fallbackUrl;
+      }
+      return chip;
+    });
 };
 
 const perform = async (z, bundle) => {
@@ -162,7 +179,21 @@ const CONTENT_FIELDS = {
     { key: 'cardTitle', label: 'Card Title', type: 'string', required: false, helpText: 'Up to 200 characters.' },
     { key: 'cardText', label: 'Card Description', type: 'text', required: false, helpText: 'Up to 2000 characters.' },
     { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'] },
-    { key: 'cardButtons', label: 'Reply Buttons', type: 'string', required: false, list: true, helpText: 'Up to 4 quick-reply buttons. Each label becomes a tappable reply in the card.' },
+    {
+      key: 'cardButtons',
+      label: 'Buttons',
+      required: false,
+      helpText: 'Up to 4 tappable buttons (extra ones are dropped).',
+      children: [
+        { key: 'buttonType', label: 'Button Type', type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
+        { key: 'buttonText', label: 'Button Text', type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
+        { key: 'postbackData', label: 'Postback Data', type: 'string', required: true, helpText: 'Identifier returned to your inbound trigger when the button is tapped.' },
+        { key: 'url', label: 'Link (open_url only)', type: 'string', helpText: 'Web page to open. Only used when Button Type = open_url.' },
+        { key: 'urlDescription', label: 'Link Description (open_url only)', type: 'string' },
+        { key: 'phoneNumber', label: 'Phone Number (dial only)', type: 'string', helpText: 'Number to call in E.164 format, with + (e.g. +44…). Only when Button Type = dial.' },
+        { key: 'fallbackUrl', label: 'Fallback URL (optional)', type: 'string', helpText: "Web page to open if the device can't place the call." },
+      ],
+    },
   ],
 };
 
