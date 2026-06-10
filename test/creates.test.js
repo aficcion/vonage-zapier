@@ -13,6 +13,19 @@ const AUTH = {
   privateKey: process.env.VONAGE_PRIVATE_KEY || '',
 };
 
+describe('session auth shape', () => {
+  test('is session auth with only apiKey/apiSecret visible fields', () => {
+    expect(App.authentication.type).toBe('session');
+    const fieldKeys = App.authentication.fields.map((f) => f.key);
+    expect(fieldKeys).toEqual(['apiKey', 'apiSecret']);
+    expect(typeof App.authentication.sessionConfig.perform).toBe('function');
+  });
+
+  test('afterResponse refresh middleware is wired', () => {
+    expect(App.afterResponse.length).toBeGreaterThan(0);
+  });
+});
+
 describe('authentication', () => {
   test('test auth returns balance', async () => {
     const bundle = { authData: AUTH };

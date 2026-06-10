@@ -40,4 +40,24 @@ const addJwtToBundle = async (request, z, bundle) => {
   return request;
 };
 
-module.exports = { addJwtToBundle };
+/**
+ * afterResponse middleware — self-healing for JWT auth.
+ * A 401 on a Bearer-authenticated request means the registered public key no
+ * longer matches our private key (rotated/overwritten outside the connector).
+ * RefreshAuthError makes Zapier re-run the session exchange — which registers
+ * a fresh key pair on the managed application — and retry the request.
+ * Basic-auth 401s (bad key/secret) fall through as normal errors.
+ */
+const refreshOnInvalidJwt = (response, z, bundle) => {
+  const authHeader =
+    (response.request &&
+      response.request.headers &&
+      response.request.headers.Authorization) ||
+    '';
+  if (response.status === 401 && authHeader.startsWith('Bearer ')) {
+    throw new z.errors.RefreshAuthError();
+  }
+  return response;
+};
+
+module.exports = { addJwtToBundle, refreshOnInvalidJwt };
