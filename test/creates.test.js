@@ -44,7 +44,7 @@ describe('send_message', () => {
     const channelField = App.creates.send_message.operation.inputFields.find(
       (f) => f.key === 'channel'
     );
-    const values = channelField.choices.map((c) => c.value);
+    const values = channelField.choices;
     expect(values).toContain('sms');
     expect(values).toContain('whatsapp');
     expect(values).toContain('rcs');
@@ -67,7 +67,7 @@ describe('send_verify', () => {
     const channelField = App.creates.send_verify.operation.inputFields.find(
       (f) => f.key === 'channel'
     );
-    const values = channelField.choices.map((c) => c.value);
+    const values = channelField.choices;
     expect(values).toContain('sms');
     expect(values).toContain('whatsapp');
     expect(values).toContain('voice');
@@ -89,7 +89,7 @@ describe('number_insight search', () => {
     const levelField = App.searches.number_insight.operation.inputFields.find(
       (f) => f.key === 'level'
     );
-    const values = levelField.choices.map((c) => c.value);
+    const values = levelField.choices;
     expect(values).toContain('basic');
     expect(values).toContain('standard');
     expect(values).toContain('advanced');
