@@ -105,6 +105,50 @@ acantilado al pasar de SMS a canales modernos.
 4. **Doctrina de pruebas**: nada es válido hasta probarlo en el diseñador real (PA) / editor real (Zapier). Los tests unitarios no ven la serialización ni la plataforma.
 5. **Consolidación PA**: "Vonage Total" (este repo) supersede al conector "Vonage SMS" (`~/power-automate-vonage-sms`, v2.1.0). Mantener el viejo solo como referencia del benchmark.
 
+## Backlog Zapier v1.1 — la UX objetivo en 3 sesiones (acordado 10-jun)
+
+**Norte de diseño:** el usuario describe QUÉ comunicar y por dónde; el conector
+resuelve solo QUIÉN firma y A DÓNDE llegan los eventos. Conexión = solo API
+key + secret. La app es un detalle interno: nace cuando hace falta
+(find-or-create "Zapier (managed)"), trabaja en silencio, se cura sola.
+
+### Sesión 1 — La conexión ideal (core)
+1. `authentication.js`: de `custom` a **session auth**. Campos: solo apiKey/apiSecret.
+   El exchange hace find-or-create de la app gestionada (nombre "Zapier"; la
+   `f56f9d40-1f1a-4861-822a-c7a3e0f4edbf` creada el 10-jun ya sirve — REUSAR),
+   genera par RSA, registra la pública (Application API, Basic, GET-merge-PUT
+   preservando capabilities) y guarda `{appId, privateKey}` en `sessionData`.
+2. `jwt_middleware.js`: firmar con `sessionData` (llega en `bundle.authData`).
+   Mantener el parche "Bearer undefined".
+3. **Auto-curación**: afterResponse → si 401 Invalid Token en endpoint JWT,
+   lanzar `z.errors.RefreshAuthError` → Zapier re-ejecuta el exchange
+   (regenera+registra clave) y reintenta. Gratis con session auth.
+4. Migración: las conexiones custom actuales quedan obsoletas (app privada, OK).
+   Recrear conexión y reconectar los Zaps de demo.
+   ✅ Criterio: conexión solo con key/secret; Send SMS + Make Call E2E en editor
+   real; romper la clave a mano y ver al conector curarse solo.
+
+### Sesión 2 — El envío ideal
+1. **Desplegables dinámicos de From**: triggers ocultos que listan números
+   (`GET /account/numbers`) y senders (`GET /beta/chatapp-accounts` — beta) por
+   canal; `dynamic` en el campo From de cada acción (texto libre como fallback).
+2. **Resolución de custodia por envío**: app dueña del From → libre/gestionada:
+   firma el conector; app del usuario: error en idioma de producto (cesión
+   opt-in = fase posterior).
+3. **Messages API only**: send_sms migra a `POST /v1/messages` (misma UX);
+   retirar `rest.nexmo.com/sms/json`. `client_ref: "vonage-zapier"` en todo envío.
+4. ⚠️ Verificar PRIMERO la incógnita: ¿acepta Messages API el JWT de la app
+   gestionada para un remitente NO vinculado? Si no → Basic para libres.
+
+### Sesión 3 — La recepción ideal y los bordes
+1. Trigger de **acuses a nivel cuenta** (`drCallBackUrl`).
+2. **"Avisar, no pisar"**: si el hueco de webhook está ocupado por URL ajena, el
+   trigger falla con explicación + checkbox "tomar el control mientras este Zap
+   esté activo".
+3. **Empty states guiados** (sin WABA/agente: helpText con enlace al alta) +
+   toggle "modo sandbox" en envíos (host messages-sandbox.nexmo.com).
+4. Pasada E2E completa (checklist de los 5 bugs como regresión) → **v1.1.0**.
+
 ## Orden recomendado
 
 1. Sesión 1 — Zapier P1 (JWT invisible + auto-curación). Máximo impacto para el benchmark: convierte al conector Zapier en la demo definitiva de "así debería ser el conector oficial".
