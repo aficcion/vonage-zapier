@@ -178,15 +178,27 @@ const CONTENT_FIELDS = {
 };
 
 // The per-button fields, generated for buttons 1..N (N = Number of Buttons).
-const buttonFieldsFor = (i) => [
-  { key: `btn${i}Type`, label: `Button ${i} — Type`, type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
-  { key: `btn${i}Text`, label: `Button ${i} — Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
-  { key: `btn${i}Postback`, label: `Button ${i} — Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
-  { key: `btn${i}Url`, label: `Button ${i} — Link (open_url)`, type: 'string', helpText: 'Web page to open. Only for Type = open_url.' },
-  { key: `btn${i}UrlDesc`, label: `Button ${i} — Link Description (open_url)`, type: 'string' },
-  { key: `btn${i}Phone`, label: `Button ${i} — Phone Number (dial)`, type: 'string', helpText: 'Number to call in E.164 with + (e.g. +44…). Only for Type = dial.' },
-  { key: `btn${i}Fallback`, label: `Button ${i} — Fallback URL (optional)`, type: 'string', helpText: "Web page to open if the device can't place the call." },
-];
+// Only the fields that apply to the chosen button type are shown — the Type
+// field re-renders the form (altersDynamicFields) like Number of Buttons does.
+const buttonFieldsFor = (i, type) => {
+  const fields = [
+    { key: `btn${i}Type`, label: `Button ${i} — Type`, type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
+    { key: `btn${i}Text`, label: `Button ${i} — Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
+    { key: `btn${i}Postback`, label: `Button ${i} — Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
+  ];
+  if (type === 'open_url') {
+    fields.push(
+      { key: `btn${i}Url`, label: `Button ${i} — Link`, type: 'string', required: true, helpText: 'Web page to open when the button is tapped.' },
+      { key: `btn${i}UrlDesc`, label: `Button ${i} — Link Description`, type: 'string' },
+    );
+  } else if (type === 'dial') {
+    fields.push(
+      { key: `btn${i}Phone`, label: `Button ${i} — Phone Number`, type: 'string', required: true, helpText: 'Number to call in E.164 with + (e.g. +44…).' },
+      { key: `btn${i}Fallback`, label: `Button ${i} — Fallback URL (optional)`, type: 'string', helpText: "Web page to open if the device can't place the call." },
+    );
+  }
+  return fields;
+};
 
 // Message Type field, with choices limited to what the chosen channel supports.
 const messageTypeField = (z, bundle) => {
@@ -220,7 +232,9 @@ const contentFields = (z, bundle) => {
   if (type === 'card') {
     const count = parseInt(bundle.inputData.cardButtonCount, 10) || 0;
     const fields = [...CONTENT_FIELDS.card];
-    for (let i = 1; i <= Math.min(count, 4); i += 1) fields.push(...buttonFieldsFor(i));
+    for (let i = 1; i <= Math.min(count, 4); i += 1) {
+      fields.push(...buttonFieldsFor(i, bundle.inputData[`btn${i}Type`] || 'reply'));
+    }
     return fields;
   }
   return CONTENT_FIELDS[type] || CONTENT_FIELDS.text;

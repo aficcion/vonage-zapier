@@ -157,11 +157,20 @@ describe('send_message', () => {
     expect(mtForWa.choices).not.toContain('card');
     const cardFields = dynFns[1](null, { inputData: { channel: 'rcs', messageType: 'card' } }).map((f) => f.key);
     expect(cardFields).toEqual(['cardMediaUrl', 'cardTitle', 'cardText', 'cardMediaHeight', 'cardButtonCount']);
-    // Picking N buttons reveals N blocks of button fields.
+    // Picking N buttons reveals N blocks of button fields, and each block
+    // only shows the fields for its button type (reply by default).
     const with2 = dynFns[1](null, { inputData: { channel: 'rcs', messageType: 'card', cardButtonCount: 2 } }).map((f) => f.key);
     expect(with2).toContain('btn1Type');
-    expect(with2).toContain('btn2Phone');
+    expect(with2).toContain('btn2Text');
+    expect(with2).not.toContain('btn2Phone');
     expect(with2).not.toContain('btn3Type');
+    const typed = dynFns[1](null, {
+      inputData: { channel: 'rcs', messageType: 'card', cardButtonCount: 2, btn1Type: 'open_url', btn2Type: 'dial' },
+    }).map((f) => f.key);
+    expect(typed).toContain('btn1Url');
+    expect(typed).not.toContain('btn1Phone');
+    expect(typed).toContain('btn2Phone');
+    expect(typed).not.toContain('btn2Url');
   });
 
   test('image caption only appears on channels that support it', () => {
