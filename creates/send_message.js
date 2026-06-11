@@ -6,7 +6,7 @@ const { normalizePhone } = require('../phone');
 // application) on the Vonage side. SMS does not — the managed JWT signs any
 // sender. `isChat` decides whether a sender-not-registered API error gets
 // translated into product language.
-const CHAT_CHANNELS = ['whatsapp', 'mms', 'viber_service', 'messenger', 'rcs'];
+const CHAT_CHANNELS = ['whatsapp', 'mms', 'viber_service', 'messenger', 'rcs', 'instagram'];
 
 // Channels that accept a caption alongside an image. RCS does not — sending one
 // returns 422 "image.caption is not supported for the given channel".
@@ -197,6 +197,7 @@ const TYPES_BY_CHANNEL = {
   whatsapp: ['text', 'image', 'audio', 'video', 'file', 'template'],
   mms: ['image', 'audio', 'video', 'file'],
   viber_service: ['text', 'image', 'video', 'file'],
+  instagram: ['text', 'image', 'audio', 'video', 'file'],
   messenger: ['text', 'image', 'audio', 'video', 'file'],
   rcs: ['text', 'image', 'video', 'file', 'card', 'carousel'],
 };
@@ -353,14 +354,16 @@ module.exports = {
           'Chat channels need a sender registered on your Vonage account first: ' +
           '[WhatsApp](https://dashboard.nexmo.com/messages/social-channels), ' +
           '[RCS](https://dashboard.nexmo.com/messages/social-channels), ' +
-          'Viber & Messenger (sales onboarding). SMS works with any of your Vonage numbers.',
+          'Viber & Messenger (sales onboarding), Instagram (early access). ' +
+          'SMS works with any of your Vonage numbers. For testing, every chat channel ' +
+          'can also run against the [Messages API Sandbox](https://dashboard.nexmo.com/messages/sandbox) with Sandbox Mode on.',
       },
       {
         key: 'channel',
         label: 'Channel',
         type: 'string',
         required: true,
-        choices: ['sms', 'whatsapp', 'mms', 'viber_service', 'messenger', 'rcs'],
+        choices: ['sms', 'whatsapp', 'mms', 'viber_service', 'messenger', 'rcs', 'instagram'],
         altersDynamicFields: true,
       },
       // Message Type — choices depend on the chosen channel.
