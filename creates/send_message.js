@@ -81,6 +81,48 @@ const buildMessagePayload = (inputData) => {
     };
   }
 
+  if (messageType === 'carousel') {
+    const count = Math.min(Math.max(parseInt(inputData.carouselCardCount, 10) || 2, 2), 10);
+    const cardContents = [];
+    for (let i = 1; i <= count; i += 1) {
+      const content = {
+        media: {
+          height: inputData.cardMediaHeight || 'MEDIUM',
+          contentInfo: { fileUrl: inputData[`crd${i}MediaUrl`] },
+        },
+      };
+      if (inputData[`crd${i}Title`]) content.title = inputData[`crd${i}Title`];
+      if (inputData[`crd${i}Text`]) content.description = inputData[`crd${i}Text`];
+      const btnType = inputData[`crd${i}BtnType`];
+      const btnText = inputData[`crd${i}BtnText`];
+      if (btnType && btnType !== 'none' && btnText) {
+        const postbackData = inputData[`crd${i}BtnPostback`] || btnText;
+        if (btnType === 'open_url') {
+          content.suggestions = [{ action: { text: btnText, postbackData, openUrlAction: { url: inputData[`crd${i}BtnUrl`] } } }];
+        } else if (btnType === 'dial') {
+          content.suggestions = [{ action: { text: btnText, postbackData, dialAction: { phoneNumber: inputData[`crd${i}BtnPhone`] } } }];
+        } else {
+          content.suggestions = [{ reply: { text: btnText, postbackData } }];
+        }
+      }
+      cardContents.push(content);
+    }
+    return {
+      ...base,
+      message_type: 'custom',
+      custom: {
+        contentMessage: {
+          richCard: {
+            carouselCard: {
+              cardWidth: inputData.carouselCardWidth || 'MEDIUM',
+              cardContents,
+            },
+          },
+        },
+      },
+    };
+  }
+
   return base;
 };
 
@@ -156,7 +198,7 @@ const TYPES_BY_CHANNEL = {
   mms: ['image', 'audio', 'video', 'file'],
   viber_service: ['text', 'image', 'video', 'file'],
   messenger: ['text', 'image', 'audio', 'video', 'file'],
-  rcs: ['text', 'image', 'video', 'file', 'card'],
+  rcs: ['text', 'image', 'video', 'file', 'card', 'carousel'],
 };
 const ALL_TYPES = ['text', 'image', 'audio', 'video', 'file', 'template'];
 
@@ -191,6 +233,36 @@ const CONTENT_FIELDS = {
     { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'] },
     { key: 'cardButtonCount', label: 'Number of Buttons', type: 'integer', required: false, default: '0', choices: ['0', '1', '2', '3', '4'], altersDynamicFields: true, helpText: 'RCS cards support up to 4 tappable buttons. Pick how many, then fill them in below.' },
   ],
+  // RCS Carousel — 2 to 10 swipeable cards, each with image + title +
+  // description and an optional tappable button.
+  carousel: [
+    { key: 'carouselCardWidth', label: 'Card Width', type: 'string', required: false, default: 'MEDIUM', choices: ['SMALL', 'MEDIUM'] },
+    { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'], helpText: 'Applies to every card in the carousel.' },
+    { key: 'carouselCardCount', label: 'Number of Cards', type: 'integer', required: true, default: '2', choices: ['2', '3', '4', '5', '6', '7', '8', '9', '10'], altersDynamicFields: true, helpText: 'RCS carousels hold 2 to 10 cards. Pick how many, then fill them in below.' },
+  ],
+};
+
+// The per-card fields of a carousel, generated for cards 1..N. Each card can
+// carry one optional button; its type decides which extra fields show.
+const carouselCardFieldsFor = (i, btnType) => {
+  const fields = [
+    { key: `crd${i}MediaUrl`, label: `Card ${i} — Image / Media URL`, type: 'string', required: true, helpText: 'Direct URL of the image shown on this card. Must return media, not a web page.' },
+    { key: `crd${i}Title`, label: `Card ${i} — Title`, type: 'string', required: false, helpText: 'Up to 200 characters.' },
+    { key: `crd${i}Text`, label: `Card ${i} — Description`, type: 'text', required: false, helpText: 'Up to 2000 characters.' },
+    { key: `crd${i}BtnType`, label: `Card ${i} — Button`, type: 'string', required: false, default: 'none', choices: ['none', 'reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'Optional button on this card: reply = quick reply · open_url = open a web page · dial = call a number.' },
+  ];
+  if (btnType && btnType !== 'none') {
+    fields.push(
+      { key: `crd${i}BtnText`, label: `Card ${i} — Button Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
+      { key: `crd${i}BtnPostback`, label: `Card ${i} — Button Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
+    );
+    if (btnType === 'open_url') {
+      fields.push({ key: `crd${i}BtnUrl`, label: `Card ${i} — Button Link`, type: 'string', required: true, helpText: 'Web page to open when the button is tapped.' });
+    } else if (btnType === 'dial') {
+      fields.push({ key: `crd${i}BtnPhone`, label: `Card ${i} — Button Phone Number`, type: 'string', required: true, helpText: 'Number to call in E.164 with + (e.g. +44…).' });
+    }
+  }
+  return fields;
 };
 
 // The per-button fields, generated for buttons 1..N (N = Number of Buttons).
@@ -249,6 +321,15 @@ const contentFields = (z, bundle) => {
     const fields = [...CONTENT_FIELDS.card];
     for (let i = 1; i <= Math.min(count, 4); i += 1) {
       fields.push(...buttonFieldsFor(i, bundle.inputData[`btn${i}Type`] || 'reply'));
+    }
+    return fields;
+  }
+  // Carousel: base fields + one block of fields per requested card.
+  if (type === 'carousel') {
+    const count = Math.min(Math.max(parseInt(bundle.inputData.carouselCardCount, 10) || 2, 2), 10);
+    const fields = [...CONTENT_FIELDS.carousel];
+    for (let i = 1; i <= count; i += 1) {
+      fields.push(...carouselCardFieldsFor(i, bundle.inputData[`crd${i}BtnType`] || 'none'));
     }
     return fields;
   }
