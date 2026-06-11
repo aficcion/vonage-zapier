@@ -173,6 +173,30 @@ describe('send_message', () => {
     expect(typed).not.toContain('btn2Url');
   });
 
+  test('RCS carousel shows N card blocks, each with its optional button fields', () => {
+    const dynFns = App.creates.send_message.operation.inputFields.filter(
+      (f) => typeof f === 'function'
+    );
+    const mtForRcs = dynFns[0](null, { inputData: { channel: 'rcs' } });
+    expect(mtForRcs.choices).toContain('carousel');
+    // Default: 2 cards, no button fields until a button type is picked.
+    const base = dynFns[1](null, { inputData: { channel: 'rcs', messageType: 'carousel' } }).map((f) => f.key);
+    expect(base).toContain('carouselCardWidth');
+    expect(base).toContain('crd1MediaUrl');
+    expect(base).toContain('crd2BtnType');
+    expect(base).not.toContain('crd1BtnText');
+    expect(base).not.toContain('crd3MediaUrl');
+    // 3 cards, card 1 with open_url button, card 2 with dial, card 3 none.
+    const typed = dynFns[1](null, {
+      inputData: { channel: 'rcs', messageType: 'carousel', carouselCardCount: 3, crd1BtnType: 'open_url', crd2BtnType: 'dial' },
+    }).map((f) => f.key);
+    expect(typed).toContain('crd3MediaUrl');
+    expect(typed).toContain('crd1BtnUrl');
+    expect(typed).not.toContain('crd1BtnPhone');
+    expect(typed).toContain('crd2BtnPhone');
+    expect(typed).not.toContain('crd3BtnText');
+  });
+
   test('image caption only appears on channels that support it', () => {
     const dynFns = App.creates.send_message.operation.inputFields.filter(
       (f) => typeof f === 'function'
