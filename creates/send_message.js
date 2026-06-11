@@ -55,24 +55,39 @@ const buildMessagePayload = (inputData) => {
   }
 
   if (messageType === 'card') {
-    const card = {
-      media_url: cardMediaUrl,
-      media_height: cardMediaHeight || 'MEDIUM',
+    // Vonage's simplified message_type "card" is rejected platform-side with a
+    // 1030 internal error (verified 2026-06-11), so the card is sent as a
+    // "custom" message with the native RBM richCard payload, which delivers.
+    const cardContent = {
+      media: {
+        height: cardMediaHeight || 'MEDIUM',
+        contentInfo: { fileUrl: cardMediaUrl },
+      },
     };
-    if (cardTitle) card.title = cardTitle;
-    if (cardText) card.text = cardText;
+    if (cardTitle) cardContent.title = cardTitle;
+    if (cardText) cardContent.description = cardText;
     const suggestions = buildSuggestions(inputData);
-    if (suggestions.length) card.suggestions = suggestions;
-    return { ...base, card, rcs: { card_orientation: 'VERTICAL' } };
+    if (suggestions.length) cardContent.suggestions = suggestions;
+    return {
+      ...base,
+      message_type: 'custom',
+      custom: {
+        contentMessage: {
+          richCard: {
+            standaloneCard: { cardOrientation: 'VERTICAL', cardContent },
+          },
+        },
+      },
+    };
   }
 
   return base;
 };
 
-// Build RCS suggestion chips from the flat per-button fields (btn1*..btn4*),
-// up to the chosen Number of Buttons. reply -> {type,text,postback_data};
-// open_url adds url/description; dial adds phone_number (keeps its +) and an
-// optional fallback_url.
+// Build native RBM suggestions from the flat per-button fields (btn1*..btn4*),
+// up to the chosen Number of Buttons. reply -> {reply:{text,postbackData}};
+// open_url -> {action:{...openUrlAction}}; dial -> {action:{...dialAction}}
+// with the phone number kept in E.164 (+) and an optional fallbackUrl.
 const buildSuggestions = (inputData) => {
   const count = parseInt(inputData.cardButtonCount, 10) || 0;
   const chips = [];
@@ -80,15 +95,16 @@ const buildSuggestions = (inputData) => {
     const text = inputData[`btn${i}Text`];
     if (!text) continue;
     const type = inputData[`btn${i}Type`] || 'reply';
-    const chip = { type, text, postback_data: inputData[`btn${i}Postback`] || text };
+    const postbackData = inputData[`btn${i}Postback`] || text;
     if (type === 'open_url') {
-      chip.url = inputData[`btn${i}Url`];
-      if (inputData[`btn${i}UrlDesc`]) chip.description = inputData[`btn${i}UrlDesc`];
+      chips.push({ action: { text, postbackData, openUrlAction: { url: inputData[`btn${i}Url`] } } });
     } else if (type === 'dial') {
-      chip.phone_number = inputData[`btn${i}Phone`]; // keep the + (E.164)
-      if (inputData[`btn${i}Fallback`]) chip.fallback_url = inputData[`btn${i}Fallback`];
+      const action = { text, postbackData, dialAction: { phoneNumber: inputData[`btn${i}Phone`] } };
+      if (inputData[`btn${i}Fallback`]) action.fallbackUrl = inputData[`btn${i}Fallback`];
+      chips.push({ action });
+    } else {
+      chips.push({ reply: { text, postbackData } });
     }
-    chips.push(chip);
   }
   return chips;
 };
@@ -189,7 +205,6 @@ const buttonFieldsFor = (i, type) => {
   if (type === 'open_url') {
     fields.push(
       { key: `btn${i}Url`, label: `Button ${i} — Link`, type: 'string', required: true, helpText: 'Web page to open when the button is tapped.' },
-      { key: `btn${i}UrlDesc`, label: `Button ${i} — Link Description`, type: 'string' },
     );
   } else if (type === 'dial') {
     fields.push(
