@@ -252,3 +252,25 @@ describe('number_insight search', () => {
     expect(values).toContain('advanced');
   });
 });
+
+describe('get_balance search', () => {
+  test('is registered with optional threshold field', () => {
+    expect(App.searches.get_balance.key).toBe('get_balance');
+    expect(App.searches.get_balance.operation.inputFields.map((f) => f.key)).toEqual(['threshold']);
+  });
+
+  test('live: returns the account balance', async () => {
+    if (!process.env.VONAGE_API_KEY) {
+      console.log('Skipping live balance test — set VONAGE_API_KEY to run');
+      return;
+    }
+    const bundle = { authData: AUTH, inputData: {} };
+    const results = await appTester(
+      App.searches.get_balance.operation.perform,
+      bundle
+    );
+    expect(results).toHaveLength(1);
+    expect(typeof results[0].balance).toBe('number');
+    expect(results[0].currency).toBe('EUR');
+  });
+});

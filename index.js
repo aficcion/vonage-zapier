@@ -26,6 +26,7 @@ const cancelVerify = require('./creates/cancel_verify');
 
 // Searches
 const numberInsight = require('./searches/number_insight');
+const getBalance = require('./searches/get_balance');
 
 module.exports = {
   version: require('./package.json').version,
@@ -64,5 +65,6 @@ module.exports = {
 
   searches: {
     [numberInsight.key]: numberInsight,
+    [getBalance.key]: getBalance,
   },
 };
