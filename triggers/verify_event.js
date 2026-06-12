@@ -64,7 +64,7 @@ module.exports = {
   display: {
     label: 'Verify Event (2FA)',
     description:
-      'Triggers when a Vonage Verify v2 workflow emits an event (completed, failed, expired, etc.). Turning the Zap on registers the webhook on your Vonage Application automatically; verifications must be started with that application (JWT) for events to flow.',
+      'Triggers when a Vonage Verify v2 workflow emits an event (completed, failed, expired, etc.). Turning the Zap on registers the webhook on your Vonage Application automatically. Verifications started with the "Send Verification Code" action emit events here out of the box.',
   },
   operation: {
     type: 'hook',

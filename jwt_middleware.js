@@ -49,12 +49,19 @@ const addJwtToBundle = async (request, z, bundle) => {
  * Basic-auth 401s (bad key/secret) fall through as normal errors.
  */
 const refreshOnInvalidJwt = (response, z, bundle) => {
-  const authHeader =
-    (response.request &&
-      response.request.headers &&
-      response.request.headers.Authorization) ||
-    '';
+  const headers = (response.request && response.request.headers) || {};
+  const authHeader = headers.Authorization || '';
   if (response.status === 401 && authHeader.startsWith('Bearer ')) {
+    // Chat-channel sends mark themselves (see send_message). There a 401 means
+    // the sender isn't linked to the connector's Vonage application — a fresh
+    // key pair won't fix that, and the refresh-retry cycle would surface as a
+    // cryptic "halted execution" error. Say what's actually wrong instead.
+    const chatChannel = headers['X-Connector-Chat-Channel'];
+    if (chatChannel) {
+      throw new z.errors.Error(
+        `Vonage rejected the ${chatChannel} send (401). This usually means the sender isn't linked to the Vonage application this connection manages — link it under External Accounts in the Vonage dashboard, or pick a registered sender from the From dropdown. If the sender is correctly linked, reconnect your Vonage account and try again.`
+      );
+    }
     throw new z.errors.RefreshAuthError();
   }
   return response;

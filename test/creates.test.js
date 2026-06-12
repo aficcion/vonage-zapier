@@ -274,3 +274,43 @@ describe('get_balance search', () => {
     expect(results[0].currency).toBe('EUR');
   });
 });
+
+describe('v1.2 fixes', () => {
+  test('send_verify no longer exposes the broken callbackUrl field', () => {
+    const fields = App.creates.send_verify.operation.inputFields.map((f) => f.key);
+    expect(fields).not.toContain('callbackUrl');
+  });
+
+  test('isForeignUrl treats placeholders as free slots', () => {
+    const { isForeignUrl } = require('../app_webhooks');
+    expect(isForeignUrl('http://example.com', '')).toBe(false);
+    expect(isForeignUrl('https://www.example.org/webhook', '')).toBe(false);
+    expect(isForeignUrl('https://nexmo-community.github.io/ncco-examples/talk.json', '')).toBe(false);
+    expect(isForeignUrl('https://hooks.zapier.com/abc', '')).toBe(false);
+    expect(isForeignUrl('https://my-crm.io/webhook', '')).toBe(true);
+  });
+
+  test('401 on a chat-channel send throws a product error, not RefreshAuthError', () => {
+    const { refreshOnInvalidJwt } = require('../jwt_middleware');
+    class FakeError extends Error {}
+    class FakeRefresh extends Error {}
+    const z = { errors: { Error: FakeError, RefreshAuthError: FakeRefresh } };
+    const chat401 = {
+      status: 401,
+      request: {
+        headers: {
+          Authorization: 'Bearer x',
+          'X-Connector-Chat-Channel': 'whatsapp',
+        },
+      },
+    };
+    expect(() => refreshOnInvalidJwt(chat401, z, {})).toThrow(FakeError);
+    expect(() => refreshOnInvalidJwt(chat401, z, {})).toThrow(/whatsapp/);
+
+    const plain401 = {
+      status: 401,
+      request: { headers: { Authorization: 'Bearer x' } },
+    };
+    expect(() => refreshOnInvalidJwt(plain401, z, {})).toThrow(FakeRefresh);
+  });
+});

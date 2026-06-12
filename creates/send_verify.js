@@ -16,23 +16,24 @@ const perform = async (z, bundle) => {
       ? { channel_timeout: parseInt(bundle.inputData.channelTimeout, 10) }
       : {}),
     ...(bundle.inputData.clientRef ? { client_ref: bundle.inputData.clientRef } : {}),
-    ...(bundle.inputData.callbackUrl ? { callback_url: bundle.inputData.callbackUrl } : {}),
     ...(bundle.inputData.fraudCheck !== undefined
       ? { fraud_check: bundle.inputData.fraudCheck }
       : {}),
   };
 
+  // Sign with the managed application JWT so the verification is owned by the
+  // app — its events then flow to the app's verify status_url and reach the
+  // "Verify Event (2FA)" trigger (Basic-auth verifications emit no events).
   const response = await z.request({
     url: 'https://api.nexmo.com/v2/verify',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      Authorization: `Basic ${Buffer.from(
-        `${bundle.authData.apiKey}:${bundle.authData.apiSecret}`
-      ).toString('base64')}`,
+      Authorization: `Bearer ${bundle.authData._jwt}`,
     },
     body,
+    skipThrowForStatus: true,
   });
 
   if (response.status >= 400) {
@@ -137,13 +138,6 @@ module.exports = {
         type: 'string',
         required: false,
         helpText: 'Your internal reference ID (max 16 characters).',
-      },
-      {
-        key: 'callbackUrl',
-        label: 'Event Callback URL',
-        type: 'string',
-        required: false,
-        helpText: 'URL Vonage will POST verification events to.',
       },
       {
         key: 'workflow',

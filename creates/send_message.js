@@ -168,6 +168,13 @@ const perform = async (z, bundle) => {
       'Content-Type': 'application/json',
       Accept: 'application/json',
       Authorization: `Bearer ${bundle.authData._jwt}`,
+      // Read by the afterResponse middleware: a 401 on a chat channel means
+      // "sender not linked to the application", not a stale key — translate it
+      // instead of entering the RefreshAuthError loop (which ends in a cryptic
+      // "halted execution" error after the retry gets 401 again).
+      ...(CHAT_CHANNELS.includes(channel)
+        ? { 'X-Connector-Chat-Channel': channel }
+        : {}),
     },
     body: payload,
     skipThrowForStatus: true,

@@ -7,11 +7,12 @@ const perform = async (z, bundle) => {
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      Authorization: `Basic ${Buffer.from(
-        `${bundle.authData.apiKey}:${bundle.authData.apiSecret}`
-      ).toString('base64')}`,
+      // Application JWT — must match the auth used by Send Verification Code
+      // (Verify v2 requests are only visible to the credential that created them).
+      Authorization: `Bearer ${bundle.authData._jwt}`,
     },
     body: { code: bundle.inputData.code },
+    skipThrowForStatus: true,
   });
 
   const data = response.json;

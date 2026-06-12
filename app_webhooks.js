@@ -16,6 +16,10 @@ const appUrl = (applicationId) =>
 const isForeignUrl = (current, previous) => {
   if (!current) return false;
   if (current === previous) return false;
+  // Obvious placeholders (Vonage's own examples, sample NCCOs) aren't anyone's
+  // working webhook — treat them as free slots, not foreign URLs.
+  if (/(^|\.|\/\/)example\.(com|org|net)/.test(current)) return false;
+  if (current.includes('nexmo-community.github.io')) return false;
   return !/(^|\.)zapier\.com/.test(current) && !current.includes('hooks.zapier');
 };
 
