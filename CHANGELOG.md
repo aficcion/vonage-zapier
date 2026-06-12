@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+- Verifications started with "Send Verification Code" are now signed with the connector's managed Vonage application, so the "Verify Event (2FA)" trigger receives their events (completed, failed…) with zero configuration. Check and Cancel share the same signature — a Verify v2 request is only visible to the credential that created it.
+- Removed the "Event Callback URL" field from Send Verification Code: Verify v2 rejects a per-request callback URL, so the field could never work. Events flow through the application webhook instead (see above).
+- New search: **Get Account Balance** — returns the account balance in EUR, with an optional "Low Balance Threshold" input that adds a ready-to-filter Below Threshold flag (Schedule → Get Balance → Filter = low-balance alert, no formulas).
+- A 401 when sending on a chat channel (WhatsApp, RCS, Messenger, Viber, Instagram, MMS) now explains that the sender isn't linked to the connector's application and how to fix it, instead of failing with a generic "halted execution" error.
+- Verify actions now report API errors in plain language (the raw platform error was shown before).
+- Webhook protection ("warn, don't clobber") no longer treats obvious placeholders (example.com, sample NCCOs) as URLs worth protecting.
+- Platform: zapier-platform-core upgraded to v19.
+
 ## 1.1.0 (updates)
 
 - RCS Rich Card is now sent as a native RBM rich card. The previous simplified format was accepted by the API but always rejected downstream with a generic "internal error" (platform bug); the native format delivers reliably.

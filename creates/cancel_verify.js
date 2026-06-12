@@ -33,11 +33,15 @@ module.exports = {
   operation: {
     inputFields: [
       {
+        // Style check D004 suggests a dynamic dropdown for ID fields, but
+        // Verify v2 has no "list in-progress verifications" endpoint and the
+        // request_id is always mapped from a previous Send Verification step.
         key: 'requestId',
         label: 'Request ID',
         type: 'string',
         required: true,
-        helpText: 'The `request_id` of the verification to cancel.',
+        helpText:
+          'The `request_id` of the verification to cancel — map it from the "Send Verification Code" step.',
       },
     ],
     perform,

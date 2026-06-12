@@ -195,7 +195,8 @@ module.exports = {
       label: 'API Secret',
       required: true,
       type: 'password',
-      helpText: 'Found next to your API Key in the Vonage dashboard.',
+      helpText:
+        'Found next to your API Key in the [Vonage API Dashboard](https://dashboard.nexmo.com/settings) under API Settings.',
     },
   ],
   sessionConfig: {
