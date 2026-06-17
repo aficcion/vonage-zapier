@@ -4,7 +4,7 @@ This document hands a **validated proof of concept** to an engineering team to t
 
 ## What this is and its status
 
-A Zapier Platform (CLI) integration for Vonage: send (SMS, WhatsApp, RCS, Viber, MMS, Messenger, Instagram), voice calls, Verify (2FA), Number Insight, balance, and native REST-hook triggers for inbound messages / message status / voice / verify events. Connection is just an API key + secret; the Vonage Application, its keys and webhooks are provisioned and self-healed automatically.
+A Zapier Platform (CLI) integration for Vonage: send (SMS, WhatsApp, RCS, Viber, MMS, Messenger, Instagram), voice calls, Verify (2FA), Number Insight, balance, and native REST-hook triggers for inbound messages / message status / voice / verify events. Connection is an API key + secret (**Managed** mode — the Vonage Application, its keys and webhooks are provisioned and self-healed automatically), with an optional **Advanced** mode where the maker brings their own Application ID + Private Key. Mirrors the two connection modes of the Power Automate connector.
 
 - **Validated end to end in the real Zapier editor**, not just unit tests (this distinction matters — see Gotchas).
 - Runs today as a private app (App241564), version 1.3.0, on `zapier-platform-core` 19.

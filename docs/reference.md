@@ -63,4 +63,9 @@ Phone numbers are normalised to E.164 without `+` (alphanumeric sender IDs and R
 
 ## Authentication summary
 
-The connection has two fields — **API Key** and **API Secret** — and uses Zapier session auth. Connecting provisions a managed Vonage Application named `Zapier` and stores `{ applicationId, privateKey }` as session data; the maker never enters or sees them. See [architecture.md](architecture.md) for the full lifecycle.
+Zapier session auth, in two modes:
+
+- **Managed (default)** — the maker enters only **API Key** and **API Secret**. Connecting provisions a managed Vonage Application named `Zapier` and stores `{ applicationId, privateKey }` as session data; the maker never sees them.
+- **Advanced (bring-your-own-app)** — the maker also fills the optional **Application ID** and **Private Key** fields, and the connector sends from that application without creating or rotating anything.
+
+See [architecture.md](architecture.md) for the full lifecycle and the design notes.

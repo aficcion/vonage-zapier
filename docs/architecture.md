@@ -23,7 +23,22 @@ sequenceDiagram
     C-->>U: sessionData = { applicationId, privateKey }
 ```
 
-`applicationId` and `privateKey` are the field names the JWT middleware and the actions already read from `bundle.authData`, so the Application plumbing stays invisible — the maker only ever sees "API key / API secret". The connection is verified by a balance call (`testAuth`).
+`applicationId` and `privateKey` are the field names the JWT middleware and the actions already read from `bundle.authData`, so the Application plumbing stays invisible. The connection is verified by a balance call (`testAuth`).
+
+### Managed vs Advanced
+
+The session exchange has two modes, decided by what the connection provides:
+
+| Mode | Connection inputs | Application used | Key |
+|------|-------------------|------------------|-----|
+| **Managed** (default) | API key + secret | The connector's own `Zapier` application (find-or-create) | Generated, registered and self-healed by the connector |
+| **Advanced** (bring-your-own-app) | API key + secret **+ Application ID + Private Key** | The maker's existing application | The maker's own key — never created, modified or rotated |
+
+`getSessionKey` branches on the optional Advanced inputs: if both are filled it uses them as-is and returns immediately; otherwise it runs the Managed provisioning above.
+
+Two implementation details worth keeping in a re-write:
+- **The Advanced inputs use different field keys (`appId`, `appPrivateKey`) from the session output (`applicationId`, `privateKey`).** On a refresh, `authData` already carries the previous session output; reusing those names would make a Managed connection look like Advanced and silently stop the key self-healing. The branch reads the stable user fields.
+- **The pasted private key is normalised** (`normalizePem`): the single-line input strips a multi-line PEM's newlines, so the connector rebuilds a valid PEM before use.
 
 ## The managed Vonage Application
 

@@ -14,15 +14,42 @@ const AUTH = {
 };
 
 describe('session auth shape', () => {
-  test('is session auth with only apiKey/apiSecret visible fields', () => {
+  test('is session auth with Managed + optional Advanced fields', () => {
     expect(App.authentication.type).toBe('session');
     const fieldKeys = App.authentication.fields.map((f) => f.key);
-    expect(fieldKeys).toEqual(['apiKey', 'apiSecret']);
+    expect(fieldKeys).toEqual(['apiKey', 'apiSecret', 'appId', 'appPrivateKey']);
     expect(typeof App.authentication.sessionConfig.perform).toBe('function');
   });
 
   test('afterResponse refresh middleware is wired', () => {
     expect(App.afterResponse.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Advanced (bring-your-own-app) auth', () => {
+  test('Advanced inputs are optional and the private key is masked', () => {
+    const fields = Object.fromEntries(
+      App.authentication.fields.map((f) => [f.key, f])
+    );
+    expect(fields.appId.required).toBeFalsy();
+    expect(fields.appPrivateKey.required).toBeFalsy();
+    expect(fields.appPrivateKey.type).toBe('password');
+  });
+
+  test('session exchange uses the supplied app/key as-is (no app provisioning)', async () => {
+    const pem =
+      '-----BEGIN PRIVATE KEY-----\nMIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8=\n-----END PRIVATE KEY-----';
+    const bundle = {
+      authData: {
+        apiKey: 'k',
+        apiSecret: 's',
+        appId: 'my-own-app-id',
+        appPrivateKey: pem,
+      },
+    };
+    const result = await appTester(App.authentication.sessionConfig.perform, bundle);
+    expect(result.applicationId).toBe('my-own-app-id');
+    expect(result.privateKey).toContain('PRIVATE KEY');
   });
 });
 

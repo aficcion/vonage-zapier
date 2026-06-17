@@ -2,7 +2,7 @@
 
 A [Zapier Platform](https://platform.zapier.com) (CLI) integration for [Vonage](https://www.vonage.com). It lets a Zapier maker send messages across channels (SMS, WhatsApp, RCS, Viber, MMS, Messenger, Instagram), place voice calls, run Verify (2FA) flows, look up account balance and Number Insight, and **receive** inbound messages, delivery receipts, and voice/verify events through native REST-hook triggers.
 
-The maker enters only a Vonage **API key and secret**. The Vonage Application that backs the JWT-authenticated APIs (Messages, Voice, Verify), its signing keys, and all the webhook plumbing are created and managed for them — they never see an Application ID or a private key.
+In the default **Managed** mode the maker enters only a Vonage **API key and secret**: the Vonage Application that backs the JWT-authenticated APIs (Messages, Voice, Verify), its signing keys, and all the webhook plumbing are created and managed for them — they never see an Application ID or a private key. An optional **Advanced** mode lets a maker who already runs their own Vonage Application send from it by supplying its Application ID and Private Key.
 
 ---
 

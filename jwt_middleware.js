@@ -62,6 +62,13 @@ const refreshOnInvalidJwt = (response, z, bundle) => {
         `Vonage rejected the ${chatChannel} send (401). This usually means the sender isn't linked to the Vonage application this connection manages — link it under External Accounts in the Vonage dashboard, or pick a registered sender from the From dropdown. If the sender is correctly linked, reconnect your Vonage account and try again.`
       );
     }
+    // Advanced (bring-your-own-app): re-running the session exchange returns the
+    // same user-supplied key, so a refresh can't fix a 401 — say what's wrong.
+    if (bundle.authData && (bundle.authData.appId || '').trim()) {
+      throw new z.errors.Error(
+        'Vonage rejected the request (401) for your Application ID / Private Key. Check that the Application ID is correct, the private key matches the public key registered on that application, and that your API key/secret belong to the same Vonage account.'
+      );
+    }
     throw new z.errors.RefreshAuthError();
   }
   return response;

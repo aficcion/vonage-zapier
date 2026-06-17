@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+
+- New **Advanced (bring-your-own-app)** connection mode, for parity with the Power Automate connector. The connection gains two optional fields — **Application ID** and **Private Key**: fill them to send from your own existing Vonage application; leave them blank to keep the default Managed behaviour (the connector provisions and self-heals a `Zapier` application for you). In Advanced mode the connector never creates, modifies or rotates an application or key. A 401 in Advanced mode now reports a clear "check your Application ID / Private Key" error instead of looping the auth refresh.
+
 ## 1.3.0
 
 - Removed the two legacy SMS-API triggers — **New Inbound SMS** and **Delivery Receipt Received** — along with the account-settings webhook module that backed them. They duplicated the Messages-API triggers **New Inbound Message** and **Message Status Updated**, which cover inbound messages and delivery/read status across every channel. Existing Zaps that relied on the removed triggers should switch to the Messages-API equivalents.
