@@ -10,3 +10,7 @@ docs/demo/*.gif
 docs/demo/*.mp4
 docs/demo/*.png
 docs/demo/voice-samples/
+
+# Internal working notes & demo assets — local only
+notes/
+.DS_Store
