@@ -6,8 +6,6 @@ const authentication = require('./authentication');
 const { addJwtToBundle, refreshOnInvalidJwt } = require('./jwt_middleware');
 
 // Triggers
-const inboundSms = require('./triggers/inbound_sms');
-const deliveryReceipt = require('./triggers/delivery_receipt');
 const inboundMessage = require('./triggers/inbound_message');
 const inboundCall = require('./triggers/inbound_call');
 const callStatus = require('./triggers/call_status');
@@ -43,8 +41,6 @@ module.exports = {
   },
 
   triggers: {
-    [inboundSms.key]: inboundSms,
-    [deliveryReceipt.key]: deliveryReceipt,
     [inboundMessage.key]: inboundMessage,
     [inboundCall.key]: inboundCall,
     [callStatus.key]: callStatus,

@@ -83,13 +83,18 @@ describe('phone normalization', () => {
 });
 
 describe('Session 3 — recepción y bordes', () => {
-  test('delivery_receipt trigger is registered as a hook', () => {
-    expect(App.triggers.delivery_receipt).toBeDefined();
-    expect(App.triggers.delivery_receipt.operation.type).toBe('hook');
+  test('message_status trigger is registered as a hook', () => {
+    expect(App.triggers.message_status).toBeDefined();
+    expect(App.triggers.message_status.operation.type).toBe('hook');
+  });
+
+  test('the legacy SMS API triggers are gone (superseded by the Messages API)', () => {
+    expect(App.triggers.inbound_sms).toBeUndefined();
+    expect(App.triggers.delivery_receipt).toBeUndefined();
   });
 
   test('hook triggers expose the takeOver field', () => {
-    ['inbound_sms', 'delivery_receipt', 'call_status', 'message_status',
+    ['call_status', 'message_status',
       'verify_event', 'inbound_call', 'inbound_message'].forEach((key) => {
       const fields = App.triggers[key].operation.inputFields.map((f) => f.key);
       expect(fields).toContain('takeOver');

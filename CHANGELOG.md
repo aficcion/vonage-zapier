@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.0
+
+- Removed the two legacy SMS-API triggers — **New Inbound SMS** and **Delivery Receipt Received** — along with the account-settings webhook module that backed them. They duplicated the Messages-API triggers **New Inbound Message** and **Message Status Updated**, which cover inbound messages and delivery/read status across every channel. Existing Zaps that relied on the removed triggers should switch to the Messages-API equivalents.
+- "Send SMS" is unaffected: it already sends over the Messages API, not the legacy SMS API.
+
 ## 1.2.0
 
 - Verifications started with "Send Verification Code" are now signed with the connector's managed Vonage application, so the "Verify Event (2FA)" trigger receives their events (completed, failed…) with zero configuration. Check and Cancel share the same signature — a Verify v2 request is only visible to the credential that created it.

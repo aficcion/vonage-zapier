@@ -44,12 +44,11 @@ A `401` on a chat-channel send (WhatsApp/RCS/etc.) usually means the **sender is
 
 ## Webhook hygiene
 
-Triggers are REST hooks: enabling a Zap subscribes a webhook, disabling it unsubscribes. Two shared modules implement the subscribe/unsubscribe pairs:
+Triggers are REST hooks: enabling a Zap subscribes a webhook, disabling it unsubscribes. `app_webhooks.js` implements the subscribe/unsubscribe pairs for webhooks that live on the Vonage **Application** (Messages `inbound_url`/`status_url`, Voice `event_url`, Verify `status_url`). It uses Basic auth — the Application API accepts it for reads and updates, so no JWT is needed to manage webhooks.
 
-- **`app_webhooks.js`** — for webhooks that live on the Vonage **Application** (Messages `inbound_url`/`status_url`, Voice `event_url`, Verify `status_url`). Uses Basic auth (the Application API accepts it for reads and updates, so no JWT is needed to manage webhooks).
-- **`account_settings.js`** — for **account-level** callbacks (legacy SMS `moCallBackUrl` / DLR `drCallBackUrl`) via the Account Settings API.
+> The connector previously also exposed legacy SMS-API account-level triggers (inbound SMS / delivery receipt via the Account Settings `moCallBackUrl`/`drCallBackUrl`). These were removed because the Messages-API triggers (**New Inbound Message**, **Message Status Updated**) cover the same ground without the duplication.
 
-Both follow the same rules:
+The subscribe/unsubscribe logic follows these rules:
 
 - **Warn, don't clobber.** If a slot already holds a URL that isn't ours and isn't an obvious placeholder (Vonage's own `example.com`/sample NCCO), it belongs to another integration. Subscribing refuses to overwrite it unless the maker ticks **"Take over the webhook"**. The displaced URL is captured in `subscribeData` and restored on unsubscribe.
 - **One Zap per slot.** An Application has one address per webhook slot, so only one Zap at a time can own a given `(capability, hook)`; the most recently enabled Zap wins. This is documented rather than worked around.

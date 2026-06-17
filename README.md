@@ -40,7 +40,7 @@ flowchart LR
 
 | Kind | Items |
 |------|-------|
-| **Triggers** | Inbound message, Message status, Inbound SMS (account), Delivery receipt (account), Inbound call, Call status, Verify event (+ dynamic dropdowns: list numbers, list senders) |
+| **Triggers** | Inbound message, Message status, Inbound call, Call status, Verify event (+ dynamic dropdowns: list numbers, list senders) |
 | **Actions** | Send SMS, Send message (multi-channel), Make call, Send/Check/Cancel verification |
 | **Searches** | Number Insight, Get account balance |
 
@@ -67,7 +67,7 @@ The integration is built on `zapier-platform-core` 19. App definition entry poin
 | `index.js` | App definition: wires triggers, actions, searches, auth and middleware. |
 | `authentication.js` | Session auth: provisions and maintains the managed `Zapier` Vonage Application. |
 | `jwt_middleware.js` | `beforeRequest`/`afterResponse`: signs the JWT and self-heals on a stale key. |
-| `app_webhooks.js`, `account_settings.js` | Subscribe/unsubscribe plumbing for Application-level and account-level webhooks. |
+| `app_webhooks.js` | Subscribe/unsubscribe plumbing for the Vonage Application webhooks. |
 | `phone.js` | Phone-number normalisation. |
 | `triggers/`, `creates/`, `searches/` | One file per trigger, action and search. |
 | `notes/` | Internal working notes and demo assets. Local only — not tracked. |

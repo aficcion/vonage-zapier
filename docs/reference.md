@@ -13,8 +13,8 @@ REST-hook triggers subscribe a webhook when a Zap is turned on and unsubscribe w
 | **New Inbound Call** | `inbound_call` | Incoming voice call | Application `voice.event_url` |
 | **Call Status Changed** | `call_status` | Voice call status change | Application `voice.event_url` |
 | **Verify Event (2FA)** | `verify_event` | Verify workflow event (completed/failed/expired) | Application `verify.status_url` |
-| **New Inbound SMS** | `inbound_sms` | Inbound SMS on an account number (legacy SMS API) | Account `moCallBackUrl` |
-| **Delivery Receipt Received** | `delivery_receipt` | DLR on an account number (legacy SMS API) | Account `drCallBackUrl` |
+
+> Inbound and delivery-receipt events are covered by **New Inbound Message** and **Message Status Updated** (Messages API). The legacy SMS-API account-level triggers (`inbound_sms`, `delivery_receipt`) have been removed as duplicates.
 
 ### Dynamic dropdowns (internal)
 
