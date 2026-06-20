@@ -483,3 +483,92 @@ describe('v1.5 — buildMessagePayload (shared engine)', () => {
     expect(carousel.cardContents[0].media.contentInfo.fileUrl).toBe('https://example.com/1.jpg');
   });
 });
+
+describe('v1.6 — chat-channel error mapping (Fix 1)', () => {
+  const { sendVia } = require('../creates/_channel_send');
+  class FakeError extends Error {}
+
+  const makeZ = (status, json) => ({
+    errors: { Error: FakeError },
+    request: async () => ({ status, json }),
+  });
+  const bundle = (over = {}) => ({
+    authData: { _jwt: 'x' },
+    inputData: {
+      from: 'agent',
+      to: '34622293256',
+      messageType: 'card',
+      cardMediaUrl: 'https://example.com/y.jpg',
+      ...over,
+    },
+  });
+
+  const messageOf = async (z, channel, over) => {
+    try {
+      await sendVia(z, bundle(over), channel);
+      return null;
+    } catch (e) {
+      return e.message;
+    }
+  };
+
+  test('422 on a chat channel surfaces the Vonage detail, NOT "isn\'t registered"', async () => {
+    const z = makeZ(422, { title: 'Invalid params' });
+    const msg = await messageOf(z, 'rcs');
+    expect(msg).toContain('Vonage rcs error: Invalid params');
+    expect(msg).not.toMatch(/isn't registered/);
+  });
+
+  test('429 on a chat channel also surfaces the real detail, not the sender message', async () => {
+    const z = makeZ(429, { detail: 'Rate limit exceeded' });
+    const msg = await messageOf(z, 'whatsapp');
+    expect(msg).toContain('Vonage whatsapp error: Rate limit exceeded');
+    expect(msg).not.toMatch(/isn't registered/);
+  });
+
+  test('401/403 on a chat channel still gives the sender-not-registered guidance', async () => {
+    const m401 = await messageOf(makeZ(401, { title: 'Unauthorized' }), 'whatsapp');
+    expect(m401).toMatch(/isn't registered/);
+    expect(m401).toContain('Vonage said: Unauthorized');
+
+    const m403 = await messageOf(makeZ(403, { detail: 'Forbidden' }), 'whatsapp');
+    expect(m403).toMatch(/isn't registered/);
+  });
+
+  test('a non-chat channel (sms) 4xx uses the generic Messages API error', async () => {
+    const msg = await messageOf(makeZ(400, { title: 'Bad Request' }), 'sms', {
+      messageType: 'text',
+      text: 'hi',
+    });
+    expect(msg).toContain('Messages API error: Bad Request');
+  });
+});
+
+describe('v1.6 — content fields are robust to a stale message type (Fix 2)', () => {
+  const { contentFields, contentFieldsFor, messageTypeField } = require('../creates/_channel_send');
+
+  test("computeContentFields('sms', {messageType: 'card'}) returns the text field (fallback)", () => {
+    // via the fixed-channel helper (closure)
+    const fixed = contentFieldsFor('sms')(null, { inputData: { messageType: 'card' } }).map((f) => f.key);
+    expect(fixed).toEqual(['text']);
+    // via the multi-channel dynamic function (channel from input)
+    const multi = contentFields(null, { inputData: { channel: 'sms', messageType: 'card' } }).map((f) => f.key);
+    expect(multi).toEqual(['text']);
+  });
+
+  test('whatsapp with a stale RCS-only type (carousel) falls back to text', () => {
+    const f = contentFields(null, { inputData: { channel: 'whatsapp', messageType: 'carousel' } }).map((x) => x.key);
+    expect(f).toEqual(['text']);
+  });
+
+  test('a still-valid stored type is preserved (rcs + card → card fields)', () => {
+    const f = contentFields(null, { inputData: { channel: 'rcs', messageType: 'card' } }).map((x) => x.key);
+    expect(f).toContain('cardMediaUrl');
+  });
+
+  test('Message Type default self-corrects when the channel no longer supports the stored type', () => {
+    const f = messageTypeField(null, { inputData: { channel: 'sms', messageType: 'card' } });
+    expect(f.choices).toEqual(['text']);
+    expect(f.default).toBe('text'); // not the stale 'card'
+  });
+});

@@ -36,7 +36,8 @@ module.exports = {
           '[RCS](https://dashboard.nexmo.com/messages/social-channels), ' +
           'Viber & Messenger (sales onboarding), Instagram (early access). ' +
           'SMS works with any of your Vonage numbers. For testing, every chat channel ' +
-          'can also run against the [Messages API Sandbox](https://dashboard.nexmo.com/messages/sandbox) with Sandbox Mode on.',
+          'can also run against the [Messages API Sandbox](https://dashboard.nexmo.com/messages/sandbox) with Sandbox Mode on. ' +
+          "If the content fields don't update after changing Channel or Message Type, click \"Refresh fields\" or reopen the step.",
       },
       {
         key: 'channel',

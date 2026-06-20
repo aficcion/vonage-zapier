@@ -198,12 +198,19 @@ const sendVia = async (z, bundle, channel) => {
     const err = response.json || {};
     const detail = err.title || err.detail || JSON.stringify(err);
 
-    // On chat channels a 401/403/4xx almost always means the sender isn't
-    // registered for that channel on this account. Say so in plain language.
-    if (CHAT_CHANNELS.includes(channel)) {
+    // On a chat channel a 401/403 almost always means the sender isn't
+    // registered/linked for that channel on this account — say so in plain
+    // language (keeping Vonage's own words too). But ONLY for auth statuses:
+    // any other 4xx/5xx (e.g. 422 "Invalid params", 429 rate limit) is a real
+    // payload/account problem, and the "sender not registered" wording would be
+    // misleading — surface Vonage's own detail prominently instead.
+    if (CHAT_CHANNELS.includes(channel) && (response.status === 401 || response.status === 403)) {
       throw new z.errors.Error(
         `Vonage couldn't send on ${channel} from "${from}". This usually means that sender isn't registered for ${channel} on your Vonage account — pick a registered sender from the dropdown, or set it up in the Vonage dashboard first. (Vonage said: ${detail})`
       );
+    }
+    if (CHAT_CHANNELS.includes(channel)) {
+      throw new z.errors.Error(`Vonage ${channel} error: ${detail}`);
     }
     throw new z.errors.Error(`Messages API error: ${detail}`);
   }
@@ -271,7 +278,7 @@ const carouselCardFieldsFor = (i, btnType) => {
     { key: `crd${i}MediaUrl`, label: `Card ${i} — Image / Media URL`, type: 'string', required: true, helpText: 'Direct URL of the image shown on this card. Must return media, not a web page.' },
     { key: `crd${i}Title`, label: `Card ${i} — Title`, type: 'string', required: false, helpText: 'Up to 200 characters.' },
     { key: `crd${i}Text`, label: `Card ${i} — Description`, type: 'text', required: false, helpText: 'Up to 2000 characters.' },
-    { key: `crd${i}BtnType`, label: `Card ${i} — Button`, type: 'string', required: false, default: 'none', choices: ['none', 'reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'Optional button on this card: reply = quick reply · open_url = open a web page · dial = call a number.' },
+    { key: `crd${i}BtnType`, label: `Card ${i} — Button`, type: 'string', required: false, default: 'none', choices: ['none', 'reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'Optional button on this card: reply = quick reply · open_url = open a web page · dial = call a number. After changing the button type, click "Refresh fields" to reveal Link/Phone.' },
   ];
   if (btnType && btnType !== 'none') {
     fields.push(
@@ -292,7 +299,7 @@ const carouselCardFieldsFor = (i, btnType) => {
 // field re-renders the form (altersDynamicFields) like Number of Buttons does.
 const buttonFieldsFor = (i, type) => {
   const fields = [
-    { key: `btn${i}Type`, label: `Button ${i} — Type`, type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
+    { key: `btn${i}Type`, label: `Button ${i} — Type`, type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'reply = quick reply · open_url = open a web page · dial = call a number. After changing the button type, click "Refresh fields" to reveal Link/Phone.' },
     { key: `btn${i}Text`, label: `Button ${i} — Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
     { key: `btn${i}Postback`, label: `Button ${i} — Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
   ];
@@ -310,21 +317,29 @@ const buttonFieldsFor = (i, type) => {
 };
 
 // Message Type field, with choices limited to what the chosen channel supports.
-const makeMessageTypeField = (channel) => {
+// `currentType` is the value already stored on the bundle (if any): when the
+// channel changed and that value is no longer valid for the new channel (e.g.
+// it stayed 'card' after switching to 'sms'), default back to the channel's
+// first valid type so the form never points at a type the channel can't send.
+const makeMessageTypeField = (channel, currentType) => {
   const choices = TYPES_BY_CHANNEL[channel] || ALL_TYPES;
+  const def = choices.includes(currentType) ? currentType : choices[0];
   return {
     key: 'messageType',
     label: 'Message Type',
     type: 'string',
     required: true,
     choices,
-    default: choices[0],
+    default: def,
     altersDynamicFields: true,
   };
 };
 
 // Dynamic Message Type field for the multi-channel action (channel from input).
-const messageTypeField = (z, bundle) => makeMessageTypeField(bundle.inputData.channel);
+// Pass the stored messageType so the default self-corrects when the channel
+// changed and the old type is no longer valid for it.
+const messageTypeField = (z, bundle) =>
+  makeMessageTypeField(bundle.inputData.channel, bundle.inputData.messageType);
 
 // Fixed-channel Message Type field for the named actions (channel via closure).
 // The channel is known up front, so this is a plain static field object.
@@ -333,10 +348,16 @@ const messageTypeFieldFor = (channel) => makeMessageTypeField(channel);
 // Content fields for the given (fixed or chosen) channel and the message type
 // the user has picked. Shared core of the dynamic `contentFields` below.
 const computeContentFields = (channel, inputData) => {
+  const validTypes = TYPES_BY_CHANNEL[channel] || ALL_TYPES;
   const mt = inputData.messageType;
-  // Fall back to the channel's first/only type so text-only channels (SMS)
-  // still show their field before the user touches Message Type.
-  const type = mt || (TYPES_BY_CHANNEL[channel] || ALL_TYPES)[0];
+  // Use the stored message type only if it's valid for THIS channel; otherwise
+  // fall back to the channel's first valid type. This covers two cases: no type
+  // chosen yet (text-only channels like SMS still show their field), and — the
+  // important one — a stale type left over from another channel (e.g. it stayed
+  // 'card' after switching to 'sms'). Rendering fields for a type the channel
+  // can't send is what made the multi-channel form go blank after switching
+  // Channel + Message Type, so never do that.
+  const type = validTypes.includes(mt) ? mt : validTypes[0];
   // Image caption only shows on channels that accept it (not RCS).
   if (type === 'image') {
     return CAPTION_CHANNELS.includes(channel)

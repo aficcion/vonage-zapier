@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.0
+
+Fixes from the end-to-end editor test pass (see the engineering notes):
+
+- **Clearer chat-channel errors.** A failed send on a chat channel (WhatsApp, RCS, MMS, Messenger, Instagram) now only shows the "that sender isn't registered…" guidance for **401/403** (the auth/linking case). Any other 4xx/5xx — e.g. `422 Invalid params`, `429` rate limit — now surfaces Vonage's own message prominently (`Vonage <channel> error: <detail>`) instead of the misleading "sender not registered" wording.
+- **Send Message (Multi-Channel) form robustness.** The content fields no longer go blank after switching **Channel** and then **Message Type**: a stored message type that isn't valid for the newly chosen channel (e.g. it stayed `card` after switching to SMS) now falls back to the channel's first valid type instead of rendering fields for a type the channel can't send. The Message Type field's default self-corrects the same way. A help note also points to **"Refresh fields"** / reopening the step in case Zapier's field cache lags.
+- **Conditional-field hint.** RCS card/carousel button-type fields now note that you may need to click **"Refresh fields"** to reveal the conditional Link/Phone field after changing a button type (a Zapier behaviour with nested dynamic fields).
+
+No behavioural change to sending itself — payloads are identical. The named **Send WhatsApp** / **Send RCS** actions were already unaffected by the multi-channel form issue (their channel is fixed).
+
 ## 1.5.0
 
 - New action **Send WhatsApp Message** — the full WhatsApp feature set (text, image, audio, video, file, and approved templates) as a named, discoverable action. The channel is fixed to WhatsApp, so there's no channel picker; everything else matches **Send Message**.
