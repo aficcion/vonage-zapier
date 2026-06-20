@@ -14,3 +14,6 @@ docs/demo/voice-samples/
 # Internal working notes & demo assets — local only
 notes/
 .DS_Store
+
+# Obsidian vault config (local)
+.obsidian/
