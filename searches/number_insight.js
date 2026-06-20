@@ -8,19 +8,27 @@ const LEVEL_URLS = {
   advanced: 'https://api.nexmo.com/ni/advanced/json',
 };
 
+const basicAuth = (authData) =>
+  `Basic ${Buffer.from(`${authData.apiKey}:${authData.apiSecret}`).toString('base64')}`;
+
 const perform = async (z, bundle) => {
   const level = bundle.inputData.level || 'standard';
   const url = LEVEL_URLS[level];
 
+  // SC-01 — credentials in the Authorization: Basic header, not the query string.
+  // The Number Insight endpoints accept Basic auth (verified 200/status 0); only
+  // the lookup parameters travel in the query string.
   const params = {
-    api_key: bundle.authData.apiKey,
-    api_secret: bundle.authData.apiSecret,
     number: normalizePhone(bundle.inputData.number),
     ...(bundle.inputData.countryCode ? { country: bundle.inputData.countryCode } : {}),
     ...(level !== 'basic' && bundle.inputData.cnam ? { cnam: true } : {}),
   };
 
-  const response = await z.request({ url, params });
+  const response = await z.request({
+    url,
+    params,
+    headers: { Authorization: basicAuth(bundle.authData), Accept: 'application/json' },
+  });
   const data = response.json;
 
   if (data.status !== 0) {

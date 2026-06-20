@@ -44,6 +44,9 @@ const perform = async (z, bundle) => {
     );
   }
 
+  // PT-03 — Voice attribution is by application_id; /v1/calls has no
+  // client_ref/tag (verified — the API returns 201 but never stores them), so
+  // there is nothing to tag here.
   const body = {
     to: [{ type: 'phone', number: normalizePhone(bundle.inputData.to) }],
     from: { type: 'phone', number: normalizePhone(bundle.inputData.from) },

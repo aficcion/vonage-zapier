@@ -1,11 +1,19 @@
 'use strict';
 
 const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
+const { verifyWebhookSignature } = require('../verify_webhook');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'messages',
   'inbound_url'
 );
+
+// CM-01 — consent signals. STOP-class keywords opt a recipient OUT; START-class
+// opt them back IN. Surfacing isOptOut/isOptIn lets a maker honour consent with
+// a simple Filter step instead of parsing the text themselves.
+const OPT_OUT_KEYWORDS = ['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT'];
+const OPT_IN_KEYWORDS = ['START', 'UNSTOP', 'YES'];
+const keywordOf = (text) => (text || '').trim().toUpperCase();
 
 const performList = async (z, bundle) => {
   return [
@@ -22,7 +30,9 @@ const performList = async (z, bundle) => {
 };
 
 const getInboundMessage = (z, bundle) => {
+  verifyWebhookSignature(z, bundle); // SC-03 (no-op unless a Signature Secret is set)
   const payload = bundle.cleanedRequest;
+  const kw = keywordOf(payload.text);
 
   return [
     {
@@ -43,6 +53,9 @@ const getInboundMessage = (z, bundle) => {
         payload.context && payload.context.message_uuid
           ? payload.context.message_uuid
           : '',
+      // CM-01 — consent flags derived from the message text.
+      isOptOut: OPT_OUT_KEYWORDS.includes(kw),
+      isOptIn: OPT_IN_KEYWORDS.includes(kw),
     },
   ];
 };
@@ -77,6 +90,8 @@ module.exports = {
       timestamp: '2026-01-01T12:00:00Z',
       clientRef: '',
       contextMessageUuid: '',
+      isOptOut: false,
+      isOptIn: false,
     },
     outputFields: [
       { key: 'messageUuid', label: 'Message UUID' },
@@ -93,6 +108,8 @@ module.exports = {
       { key: 'timestamp', label: 'Timestamp' },
       { key: 'clientRef', label: 'Client Reference' },
       { key: 'contextMessageUuid', label: 'Context Message UUID' },
+      { key: 'isOptOut', label: 'Is Opt-Out (STOP keyword)', type: 'boolean' },
+      { key: 'isOptIn', label: 'Is Opt-In (START keyword)', type: 'boolean' },
     ],
   },
 };

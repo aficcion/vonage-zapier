@@ -15,7 +15,8 @@ const perform = async (z, bundle) => {
     ...(bundle.inputData.channelTimeout
       ? { channel_timeout: parseInt(bundle.inputData.channelTimeout, 10) }
       : {}),
-    ...(bundle.inputData.clientRef ? { client_ref: bundle.inputData.clientRef } : {}),
+    // PT-02 — always tag with the maker's client_ref, or the BI attribution tag.
+    client_ref: bundle.inputData.clientRef || 'connector-zapier',
     ...(bundle.inputData.fraudCheck !== undefined
       ? { fraud_check: bundle.inputData.fraudCheck }
       : {}),

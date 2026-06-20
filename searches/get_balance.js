@@ -1,12 +1,14 @@
 'use strict';
 
+const basicAuth = (authData) =>
+  `Basic ${Buffer.from(`${authData.apiKey}:${authData.apiSecret}`).toString('base64')}`;
+
 const perform = async (z, bundle) => {
+  // SC-01 — credentials in the Authorization: Basic header, not the query string
+  // (rest.nexmo.com/account/get-balance accepts Basic, verified).
   const response = await z.request({
     url: 'https://rest.nexmo.com/account/get-balance',
-    params: {
-      api_key: bundle.authData.apiKey,
-      api_secret: bundle.authData.apiSecret,
-    },
+    headers: { Authorization: basicAuth(bundle.authData), Accept: 'application/json' },
   });
 
   const data = response.json;

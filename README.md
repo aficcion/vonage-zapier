@@ -69,6 +69,7 @@ The integration is built on `zapier-platform-core` 19. App definition entry poin
 | `authentication.js` | Session auth (Managed + Advanced): provisions and maintains the managed `Zapier` Vonage Application, or uses the maker's own app in Advanced mode. |
 | `jwt_middleware.js` | `beforeRequest`/`afterResponse`: signs the JWT and self-heals on a stale key. |
 | `app_webhooks.js` | Subscribe/unsubscribe plumbing for the Vonage Application webhooks. |
+| `verify_webhook.js` | Optional inbound-webhook signature verification (HS256 with the connection's Signature Secret); no-op when unset. |
 | `phone.js` | Phone-number normalisation. |
 | `creates/_channel_send.js` | Shared Messages API engine (payload builder, dynamic fields, request) behind Send Message, Send WhatsApp and Send RCS. |
 | `triggers/`, `creates/`, `searches/` | One file per trigger, action and search. |

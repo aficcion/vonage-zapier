@@ -21,6 +21,38 @@ const parseJsonField = (z, raw, label) => {
   }
 };
 
+// SC-04 — anti-SSRF allowlist. This action signs requests with the maker's
+// Vonage credentials, so it must only ever reach Vonage hosts — never an
+// attacker-supplied URL (which could exfiltrate the JWT/Basic header or hit
+// internal metadata endpoints). Only these exact hosts (or their subdomains)
+// are allowed.
+const ALLOWED_HOSTS = [
+  'api.nexmo.com',
+  'rest.nexmo.com',
+  'api.vonage.com',
+  'messages-sandbox.nexmo.com',
+  'api-eu.vonage.com',
+  'api-us.vonage.com',
+];
+
+const assertVonageHost = (z, fullUrl) => {
+  let hostname;
+  try {
+    hostname = new URL(fullUrl).hostname.toLowerCase();
+  } catch (e) {
+    throw new z.errors.Error(`The URL "${fullUrl}" isn't a valid URL.`);
+  }
+  const ok = ALLOWED_HOSTS.some(
+    (h) => hostname === h || hostname.endsWith(`.${h}`)
+  );
+  if (!ok) {
+    throw new z.errors.Error(
+      `For security, API Request can only call Vonage hosts. "${hostname}" is not allowed. ` +
+        `Use one of: ${ALLOWED_HOSTS.join(', ')}.`
+    );
+  }
+};
+
 const perform = async (z, bundle) => {
   const { method, url, auth } = bundle.inputData;
   const headers = parseJsonField(z, bundle.inputData.requestHeaders, 'Headers') || {};
@@ -29,6 +61,7 @@ const perform = async (z, bundle) => {
 
   // Tolerate a URL pasted without a scheme.
   const fullUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+  assertVonageHost(z, fullUrl);
 
   const authHeader =
     auth === 'basic'

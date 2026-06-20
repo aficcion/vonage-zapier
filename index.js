@@ -40,6 +40,11 @@ module.exports = {
   afterResponse: [refreshOnInvalidJwt],
 
   flags: {
+    // SC-06 — cleanInputData:false is intentional. Zapier's default cleaner
+    // trims/normalises input values, which would corrupt the data this connector
+    // passes through verbatim: multi-line PEM private keys (Advanced auth) and
+    // raw JSON bodies (API Request, Template Components, Custom Workflow). Keep
+    // it off so those reach Vonage exactly as the maker entered them.
     cleanInputData: false,
   },
 

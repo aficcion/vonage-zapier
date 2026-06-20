@@ -17,6 +17,7 @@ const performList = async (z, bundle) => {
 };
 
 const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
+const { verifyWebhookSignature } = require('../verify_webhook');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'voice',
@@ -35,6 +36,7 @@ const normaliseList = (value, fallback) => {
 };
 
 const getCallStatus = (z, bundle) => {
+  verifyWebhookSignature(z, bundle); // SC-03 (no-op unless a Signature Secret is set)
   const payload = bundle.cleanedRequest;
 
   const watchedStatuses = normaliseList(bundle.inputData.statuses, FINAL_STATUSES);

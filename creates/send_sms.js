@@ -17,7 +17,7 @@ const perform = async (z, bundle) => {
     from,
     to,
     text,
-    client_ref: 'vonage-zapier',
+    client_ref: 'connector-zapier', // PT-01 — BI attribution tag
     sms: { encoding_type: unicode ? 'unicode' : 'text' },
     ...(ttl ? { ttl: parseInt(ttl, 10) } : {}),
   };

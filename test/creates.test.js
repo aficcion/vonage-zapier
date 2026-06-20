@@ -17,7 +17,7 @@ describe('session auth shape', () => {
   test('is session auth with Managed + optional Advanced fields', () => {
     expect(App.authentication.type).toBe('session');
     const fieldKeys = App.authentication.fields.map((f) => f.key);
-    expect(fieldKeys).toEqual(['apiKey', 'apiSecret', 'appId', 'appPrivateKey']);
+    expect(fieldKeys).toEqual(['apiKey', 'apiSecret', 'appId', 'appPrivateKey', 'signatureSecret']);
     expect(typeof App.authentication.sessionConfig.perform).toBe('function');
   });
 
@@ -54,12 +54,14 @@ describe('Advanced (bring-your-own-app) auth', () => {
 });
 
 describe('authentication', () => {
-  test('test auth returns balance', async () => {
-    const bundle = { authData: AUTH };
-    if (!process.env.VONAGE_API_KEY) {
-      console.log('Skipping live auth test — set VONAGE_API_KEY to run');
+  test('live: test auth returns balance', async () => {
+    // Live test — gated behind RUN_LIVE_TESTS so the default `npx jest` stays a
+    // pure unit run (no network, no real credentials needed).
+    if (!process.env.RUN_LIVE_TESTS) {
+      console.log('Skipping live auth test — set RUN_LIVE_TESTS=1 to run');
       return;
     }
+    const bundle = { authData: AUTH };
     const result = await appTester(App.authentication.test, bundle);
     expect(result).toHaveProperty('balance');
   });
@@ -292,8 +294,9 @@ describe('get_balance search', () => {
   });
 
   test('live: returns the account balance', async () => {
-    if (!process.env.VONAGE_API_KEY) {
-      console.log('Skipping live balance test — set VONAGE_API_KEY to run');
+    // Live test — gated behind RUN_LIVE_TESTS (skipped by default).
+    if (!process.env.RUN_LIVE_TESTS) {
+      console.log('Skipping live balance test — set RUN_LIVE_TESTS=1 to run');
       return;
     }
     const bundle = { authData: AUTH, inputData: {} };
@@ -570,5 +573,172 @@ describe('v1.6 — content fields are robust to a stale message type (Fix 2)', (
     const f = messageTypeField(null, { inputData: { channel: 'sms', messageType: 'card' } });
     expect(f.choices).toEqual(['text']);
     expect(f.default).toBe('text'); // not the stale 'card'
+  });
+});
+
+describe('v1.7 — Readiness Gate (Security / Compliance / BI / Consent)', () => {
+  class FakeError extends Error {}
+  const z = { errors: { Error: FakeError }, console: { log: () => {} } };
+
+  // SC-03 — connection exposes an optional signatureSecret (masked).
+  test('SC-03: auth has an optional masked signatureSecret field', () => {
+    const fields = Object.fromEntries(App.authentication.fields.map((f) => [f.key, f]));
+    expect(fields.signatureSecret).toBeDefined();
+    expect(fields.signatureSecret.required).toBeFalsy();
+    expect(fields.signatureSecret.type).toBe('password');
+  });
+
+  // SC-02 — verify_event must NOT emit the OTP.
+  test('SC-02: verify_event output omits submittedCode', () => {
+    const out = App.triggers.verify_event.operation.perform(z, {
+      inputData: { eventTypes: 'completed,failed' },
+      authData: {},
+      cleanedRequest: {
+        request_id: 'r1', status: 'completed', type: 'event',
+        submitted_code: '1234', channel: 'sms',
+      },
+    })[0];
+    expect(out).not.toHaveProperty('submittedCode');
+    expect(JSON.stringify(out)).not.toContain('1234');
+    expect(out.requestId).toBe('r1');
+    // sample/outputFields must not leak it either
+    expect(App.triggers.verify_event.operation.sample).not.toHaveProperty('submittedCode');
+  });
+
+  // SC-03 — verifyWebhookSignature behaviour.
+  describe('SC-03: verifyWebhookSignature', () => {
+    const { verifyWebhookSignature } = require('../verify_webhook');
+    const jwt = require('jsonwebtoken');
+    const SECRET = 'super-secret-signing-key';
+
+    test('no Signature Secret → no-op (does not throw, even without a token)', () => {
+      expect(() =>
+        verifyWebhookSignature(z, { authData: {}, rawRequest: { headers: {} } })
+      ).not.toThrow();
+    });
+
+    test('valid HS256 token signed with the secret passes', () => {
+      const token = jwt.sign({ iat: Math.floor(Date.now() / 1000) }, SECRET, { algorithm: 'HS256' });
+      expect(() =>
+        verifyWebhookSignature(z, {
+          authData: { signatureSecret: SECRET },
+          rawRequest: { headers: { Authorization: `Bearer ${token}` } },
+        })
+      ).not.toThrow();
+    });
+
+    test('a forged/invalid token throws', () => {
+      const bad = jwt.sign({}, 'a-different-secret', { algorithm: 'HS256' });
+      expect(() =>
+        verifyWebhookSignature(z, {
+          authData: { signatureSecret: SECRET },
+          rawRequest: { headers: { authorization: `Bearer ${bad}` } },
+        })
+      ).toThrow(FakeError);
+    });
+
+    test('secret set but no token throws', () => {
+      expect(() =>
+        verifyWebhookSignature(z, { authData: { signatureSecret: SECRET }, rawRequest: { headers: {} } })
+      ).toThrow(FakeError);
+    });
+
+    test('hook triggers still fire with no Signature Secret set', () => {
+      const out = App.triggers.message_status.operation.perform(z, {
+        inputData: { statuses: 'delivered,failed' },
+        authData: {},
+        rawRequest: { headers: {} },
+        cleanedRequest: { message_uuid: 'm1', status: 'delivered', to: 't', from: 'f', channel: 'sms' },
+      });
+      expect(out).toHaveLength(1);
+      expect(out[0].messageUuid).toBe('m1');
+    });
+  });
+
+  // SC-04 — api_request anti-SSRF allowlist.
+  describe('SC-04: api_request host allowlist', () => {
+    const perform = App.creates.api_request.operation.perform;
+    const baseBundle = (url) => ({ authData: { _jwt: 'x' }, inputData: { url, auth: 'jwt' } });
+
+    test('rejects a non-Vonage host', async () => {
+      await expect(perform(z, baseBundle('https://evil.example.com/steal'))).rejects.toThrow(FakeError);
+      let msg = '';
+      try { await perform(z, baseBundle('http://169.254.169.254/latest/meta-data')); } catch (e) { msg = e.message; }
+      expect(msg).toMatch(/only call Vonage hosts/i);
+    });
+
+    test('rejects a look-alike host (suffix trick)', async () => {
+      await expect(perform(z, baseBundle('https://api.nexmo.com.evil.com/x'))).rejects.toThrow(FakeError);
+    });
+
+    test('accepts api.nexmo.com (passes the allowlist, then makes the request)', async () => {
+      const zMock = {
+        errors: { Error: FakeError },
+        console: { log: () => {} },
+        request: async () => ({ status: 200, json: { ok: true }, headers: { entries: () => [] } }),
+      };
+      const res = await perform(zMock, baseBundle('https://api.nexmo.com/v1/messages'));
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true });
+    });
+  });
+
+  // SC-05 — invalid Template Components JSON throws a clear, field-named error.
+  test('SC-05: invalid templateComponents throws a clear error (no raw SyntaxError leak)', () => {
+    const { buildMessagePayload } = require('../creates/_channel_send');
+    expect(() =>
+      buildMessagePayload({
+        channel: 'whatsapp', messageType: 'template', to: '1', from: 'B',
+        templateName: 'welcome', templateComponents: '{not valid',
+      })
+    ).toThrow(/"Template Components \(JSON\)" field isn't valid JSON/);
+  });
+
+  // PT-01 / PT-02 — BI attribution tag.
+  describe('PT-01/PT-02: client_ref = connector-zapier', () => {
+    const { buildMessagePayload } = require('../creates/_channel_send');
+    test('unified/named send payload tags client_ref', () => {
+      const p = buildMessagePayload({ channel: 'sms', messageType: 'text', to: '1', from: 'B', text: 'hi' });
+      expect(p.client_ref).toBe('connector-zapier');
+    });
+    test('send_sms perform tags client_ref', async () => {
+      let sent;
+      const zMock = {
+        errors: { Error: FakeError },
+        request: async (req) => { sent = req; return { status: 202, json: { message_uuid: 'u' } }; },
+      };
+      await App.creates.send_sms.operation.perform(zMock, {
+        authData: { _jwt: 'x' }, inputData: { from: 'B', to: '1', text: 'hi' },
+      });
+      expect(sent.body.client_ref).toBe('connector-zapier');
+    });
+    test('send_verify defaults client_ref when the maker leaves it blank', async () => {
+      let sent;
+      const zMock = {
+        errors: { Error: FakeError },
+        request: async (req) => { sent = req; return { status: 202, json: { request_id: 'r' } }; },
+      };
+      await App.creates.send_verify.operation.perform(zMock, {
+        authData: { _jwt: 'x' }, inputData: { brand: 'Acme', to: '15551234567', channel: 'sms' },
+      });
+      expect(sent.body.client_ref).toBe('connector-zapier');
+    });
+  });
+
+  // CM-01 — consent flags on inbound_message.
+  test('CM-01: inbound_message flags isOptOut for "STOP" and isOptIn for "START"', () => {
+    const run = (text) => App.triggers.inbound_message.operation.perform(z, {
+      inputData: {}, authData: {}, rawRequest: { headers: {} },
+      cleanedRequest: { message_uuid: 'm', from: 'f', to: 't', text },
+    })[0];
+    const stop = run('  stop ');
+    expect(stop.isOptOut).toBe(true);
+    expect(stop.isOptIn).toBe(false);
+    const start = run('START');
+    expect(start.isOptIn).toBe(true);
+    expect(start.isOptOut).toBe(false);
+    const normal = run('hello there');
+    expect(normal.isOptOut).toBe(false);
+    expect(normal.isOptIn).toBe(false);
   });
 });

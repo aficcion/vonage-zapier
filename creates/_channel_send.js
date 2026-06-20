@@ -35,7 +35,7 @@ const buildMessagePayload = (inputData) => {
     message_type: messageType,
     to: normalizePhone(to),
     from: normalizePhone(from),
-    client_ref: 'vonage-zapier',
+    client_ref: 'connector-zapier', // PT-01 — BI attribution tag
   };
 
   if (messageType === 'text') return { ...base, text };
@@ -56,12 +56,24 @@ const buildMessagePayload = (inputData) => {
   if (messageType === 'file') return { ...base, file: { url: fileUrl } };
 
   if (messageType === 'template') {
+    // SC-05 — guard the JSON.parse so a malformed "Template Components" value
+    // surfaces a clear, field-named error instead of a raw SyntaxError/stack.
+    let components = [];
+    if (templateComponents) {
+      try {
+        components = JSON.parse(templateComponents);
+      } catch (e) {
+        throw new Error(
+          `The "Template Components (JSON)" field isn't valid JSON: ${e.message}`
+        );
+      }
+    }
     return {
       ...base,
       template: {
         name: templateName,
         language: { code: templateLanguage || 'en_US' },
-        components: templateComponents ? JSON.parse(templateComponents) : [],
+        components,
       },
     };
   }

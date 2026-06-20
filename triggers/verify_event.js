@@ -12,6 +12,7 @@ const performList = async (z, bundle) => {
 };
 
 const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
+const { verifyWebhookSignature } = require('../verify_webhook');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'verify',
@@ -30,6 +31,7 @@ const normaliseList = (value, fallback) => {
 };
 
 const getVerifyEvent = (z, bundle) => {
+  verifyWebhookSignature(z, bundle); // SC-03 (no-op unless a Signature Secret is set)
   const payload = bundle.cleanedRequest;
 
   const watchedTypes = normaliseList(bundle.inputData.eventTypes, [
@@ -43,6 +45,13 @@ const getVerifyEvent = (z, bundle) => {
   const outcome = String(payload.status || payload.type || '').toLowerCase();
   if (!watchedTypes.includes(outcome)) return [];
 
+  // SC-02 — never surface the submitted OTP to the Task History (a one-time
+  // code is a sensitive credential). Keep it out of the output entirely; log it
+  // only for local debugging.
+  if (payload.submitted_code) {
+    z.console.log('verify_event submitted_code (debug only, not emitted):', payload.submitted_code);
+  }
+
   return [
     {
       requestId: payload.request_id,
@@ -50,7 +59,6 @@ const getVerifyEvent = (z, bundle) => {
       finalisedAt: payload.finalised_at || '',
       type: payload.type,
       channel: payload.channel || '',
-      submittedCode: payload.submitted_code || '',
       status: payload.status || '',
       channelTimeout: payload.channel_timeout || '',
       clientRef: payload.client_ref || '',

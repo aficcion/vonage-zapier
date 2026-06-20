@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.7.0
+
+Readiness Gate hardening (Security/Compliance, Product/BI, Consent). No change to what the connector *does* — only how it does it.
+
+**Security / Compliance**
+- **Credentials out of the URL** (SC-01): the auth test, **Get Account Balance** and **Number Insight Lookup** now send API key/secret in the `Authorization: Basic` header instead of the query string, so credentials can't leak into logs/proxies/history. (Both endpoints accept Basic — verified.)
+- **OTP no longer in Task History** (SC-02): the **Verify Event** trigger no longer outputs `submittedCode`. A submitted one-time code is a sensitive credential and is now kept out of the output entirely (debug-only logging).
+- **Optional webhook signature verification** (SC-03): a new **optional** connection field **Signature Secret** (copy it from Dashboard → Settings → Signed Webhooks). Leave it blank and nothing changes (triggers fire as before). Set it and every inbound/status/verify webhook trigger verifies the HS256 JWT Vonage signs with your Signature Secret (plus the payload hash when present), rejecting forged webhooks.
+- **Anti-SSRF allowlist on API Request** (SC-04): the raw **API Request** action now only calls Vonage hosts (`api.nexmo.com`, `rest.nexmo.com`, `api.vonage.com`, `messages-sandbox.nexmo.com`, `api-eu.vonage.com`, `api-us.vonage.com`), so a stray/hostile URL can't be sent your signed credentials.
+- **Clear error for bad Template Components JSON** (SC-05): a malformed Template Components value now raises a clear, field-named message instead of a raw `SyntaxError`.
+- **Documented `cleanInputData: false`** (SC-06): a comment explains it's intentional — it preserves multi-line PEM keys and raw JSON bodies verbatim.
+
+**Product / BI**
+- **Attribution tag** (PT-01/PT-02): the message `client_ref` changed `vonage-zapier` → `connector-zapier` (Send SMS + all Messages sends); **Send Verification Code** now always tags `client_ref` (your value, or `connector-zapier` by default).
+- PT-03 (N/A): Voice attribution is by `application_id`; `/v1/calls` has no `client_ref`/`tag` (verified) — comment only, no behaviour change.
+
+**Consent**
+- **Opt-out / opt-in signals** (CM-01): **New Inbound Message** now outputs `isOptOut` (STOP / STOPALL / UNSUBSCRIBE / CANCEL / END / QUIT) and `isOptIn` (START / UNSTOP / YES) so you can honour consent with a simple Filter step.
+
+**Tests:** the two live (network) smoke tests are gated behind `RUN_LIVE_TESTS` so the default `npx jest` is a pure unit run.
+
 ## 1.6.0
 
 Fixes from the end-to-end editor test pass (see the engineering notes):

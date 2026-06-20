@@ -14,6 +14,7 @@ const performList = async (z, bundle) => {
 };
 
 const { makeAppWebhookHooks, takeOverField } = require('../app_webhooks');
+const { verifyWebhookSignature } = require('../verify_webhook');
 
 const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
   'voice',
@@ -21,6 +22,7 @@ const { subscribeHook, unsubscribeHook } = makeAppWebhookHooks(
 );
 
 const getInboundCall = (z, bundle) => {
+  verifyWebhookSignature(z, bundle); // SC-03 (no-op unless a Signature Secret is set)
   const payload = bundle.cleanedRequest;
 
   // The application's event_url receives every event of every call on this

@@ -198,13 +198,13 @@ const getSessionKey = async (z, bundle) => {
 };
 
 const testAuth = async (z, bundle) => {
-  // Verify credentials by fetching account balance
+  // Verify credentials by fetching account balance. Credentials go in the
+  // Authorization: Basic header (SC-01) — never in the URL/query string, so they
+  // can't leak into request logs, proxies or browser history.
   const response = await z.request({
     url: 'https://rest.nexmo.com/account/get-balance',
-    params: {
-      api_key: bundle.authData.apiKey,
-      api_secret: bundle.authData.apiSecret,
-    },
+    headers: { Authorization: basicAuth(bundle.authData), Accept: 'application/json' },
+    skipThrowForStatus: true,
   });
 
   if (response.status !== 200) {
@@ -253,6 +253,21 @@ module.exports = {
       type: 'password',
       helpText:
         'Optional. The private key (PEM) of the application above. Required only when using your own application. Paste the whole key, including the BEGIN and END lines.',
+    },
+    {
+      // SC-03 — OPTIONAL webhook signature verification. Left optional on
+      // purpose: the Signature Secret isn't retrievable via API (the maker must
+      // copy it by hand), so requiring it would add friction for everyone. Leave
+      // blank to keep the current behaviour (no verification); fill it to have
+      // inbound webhook triggers verify Vonage's signed JWT (see verify_webhook.js).
+      key: 'signatureSecret',
+      label: 'Signature Secret (Optional — verify webhooks)',
+      required: false,
+      type: 'password',
+      helpText:
+        'Optional. Copy it from your [Vonage Dashboard → Settings → Signed Webhooks](https://dashboard.nexmo.com/settings). ' +
+        'When set, the inbound/status/verify-event triggers verify the signature Vonage attaches to each webhook (HS256 JWT) and reject forgeries. ' +
+        'Leave blank to skip verification (default).',
     },
   ],
   sessionConfig: {
