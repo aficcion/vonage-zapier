@@ -17,10 +17,13 @@ const listSenders = require('./triggers/list_senders');
 // Creates (Actions)
 const sendSms = require('./creates/send_sms');
 const sendMessage = require('./creates/send_message');
+const sendWhatsapp = require('./creates/send_whatsapp');
+const sendRcs = require('./creates/send_rcs');
 const makeCall = require('./creates/make_call');
 const sendVerify = require('./creates/send_verify');
 const checkVerify = require('./creates/check_verify');
 const cancelVerify = require('./creates/cancel_verify');
+const apiRequest = require('./creates/api_request');
 
 // Searches
 const numberInsight = require('./searches/number_insight');
@@ -53,10 +56,13 @@ module.exports = {
   creates: {
     [sendSms.key]: sendSms,
     [sendMessage.key]: sendMessage,
+    [sendWhatsapp.key]: sendWhatsapp,
+    [sendRcs.key]: sendRcs,
     [makeCall.key]: makeCall,
     [sendVerify.key]: sendVerify,
     [checkVerify.key]: checkVerify,
     [cancelVerify.key]: cancelVerify,
+    [apiRequest.key]: apiRequest,
   },
 
   searches: {

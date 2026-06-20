@@ -1,0 +1,447 @@
+'use strict';
+
+// Shared Messages API engine for the messaging actions.
+//
+// `send_message` (multi-channel) and the named single-channel actions
+// (`send_whatsapp`, `send_rcs`) all send the same way — the only difference is
+// whether the channel comes from a user-chosen field or is fixed. Everything
+// that builds the payload, the dynamic input fields and performs the request
+// lives here so there is one engine, not three.
+//
+// This file is deliberately prefixed with `_` and is NOT a Zapier create on its
+// own (a create object only allows key/noun/display/operation). It is consumed
+// by send_message.js / send_whatsapp.js / send_rcs.js and by the test suite.
+
+const { normalizePhone } = require('../phone');
+
+// Chat channels require the sender to be registered (and linked to an
+// application) on the Vonage side. SMS does not — the managed JWT signs any
+// sender. `isChat` decides whether a sender-not-registered API error gets
+// translated into product language.
+const CHAT_CHANNELS = ['whatsapp', 'mms', 'viber_service', 'messenger', 'rcs', 'instagram'];
+
+// Channels that accept a caption alongside an image. RCS does not — sending one
+// returns 422 "image.caption is not supported for the given channel".
+const CAPTION_CHANNELS = ['whatsapp', 'mms', 'messenger', 'viber_service'];
+
+const buildMessagePayload = (inputData) => {
+  const { channel, messageType, to, from, text, imageUrl, imageCaption,
+    audioUrl, videoUrl, fileUrl, templateName, templateLanguage,
+    templateComponents, cardMediaUrl, cardTitle, cardText,
+    cardMediaHeight } = inputData;
+
+  const base = {
+    channel,
+    message_type: messageType,
+    to: normalizePhone(to),
+    from: normalizePhone(from),
+    client_ref: 'vonage-zapier',
+  };
+
+  if (messageType === 'text') return { ...base, text };
+
+  if (messageType === 'image') {
+    const image = { url: imageUrl };
+    // Only attach a caption on channels that support it (RCS rejects it).
+    if (imageCaption && CAPTION_CHANNELS.includes(channel)) {
+      image.caption = imageCaption;
+    }
+    return { ...base, image };
+  }
+
+  if (messageType === 'audio') return { ...base, audio: { url: audioUrl } };
+
+  if (messageType === 'video') return { ...base, video: { url: videoUrl } };
+
+  if (messageType === 'file') return { ...base, file: { url: fileUrl } };
+
+  if (messageType === 'template') {
+    return {
+      ...base,
+      template: {
+        name: templateName,
+        language: { code: templateLanguage || 'en_US' },
+        components: templateComponents ? JSON.parse(templateComponents) : [],
+      },
+    };
+  }
+
+  if (messageType === 'card') {
+    // Vonage's simplified message_type "card" is rejected platform-side with a
+    // 1030 internal error (verified 2026-06-11), so the card is sent as a
+    // "custom" message with the native RBM richCard payload, which delivers.
+    const cardContent = {
+      media: {
+        height: cardMediaHeight || 'MEDIUM',
+        contentInfo: { fileUrl: cardMediaUrl },
+      },
+    };
+    if (cardTitle) cardContent.title = cardTitle;
+    if (cardText) cardContent.description = cardText;
+    const suggestions = buildSuggestions(inputData);
+    if (suggestions.length) cardContent.suggestions = suggestions;
+    return {
+      ...base,
+      message_type: 'custom',
+      custom: {
+        contentMessage: {
+          richCard: {
+            standaloneCard: { cardOrientation: 'VERTICAL', cardContent },
+          },
+        },
+      },
+    };
+  }
+
+  if (messageType === 'carousel') {
+    const count = Math.min(Math.max(parseInt(inputData.carouselCardCount, 10) || 2, 2), 10);
+    const cardContents = [];
+    for (let i = 1; i <= count; i += 1) {
+      const content = {
+        media: {
+          height: inputData.cardMediaHeight || 'MEDIUM',
+          contentInfo: { fileUrl: inputData[`crd${i}MediaUrl`] },
+        },
+      };
+      if (inputData[`crd${i}Title`]) content.title = inputData[`crd${i}Title`];
+      if (inputData[`crd${i}Text`]) content.description = inputData[`crd${i}Text`];
+      const btnType = inputData[`crd${i}BtnType`];
+      const btnText = inputData[`crd${i}BtnText`];
+      if (btnType && btnType !== 'none' && btnText) {
+        const postbackData = inputData[`crd${i}BtnPostback`] || btnText;
+        if (btnType === 'open_url') {
+          content.suggestions = [{ action: { text: btnText, postbackData, openUrlAction: { url: inputData[`crd${i}BtnUrl`] } } }];
+        } else if (btnType === 'dial') {
+          content.suggestions = [{ action: { text: btnText, postbackData, dialAction: { phoneNumber: inputData[`crd${i}BtnPhone`] } } }];
+        } else {
+          content.suggestions = [{ reply: { text: btnText, postbackData } }];
+        }
+      }
+      cardContents.push(content);
+    }
+    return {
+      ...base,
+      message_type: 'custom',
+      custom: {
+        contentMessage: {
+          richCard: {
+            carouselCard: {
+              cardWidth: inputData.carouselCardWidth || 'MEDIUM',
+              cardContents,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  return base;
+};
+
+// Build native RBM suggestions from the flat per-button fields (btn1*..btn4*),
+// up to the chosen Number of Buttons. reply -> {reply:{text,postbackData}};
+// open_url -> {action:{...openUrlAction}}; dial -> {action:{...dialAction}}
+// with the phone number kept in E.164 (+) and an optional fallbackUrl.
+const buildSuggestions = (inputData) => {
+  const count = parseInt(inputData.cardButtonCount, 10) || 0;
+  const chips = [];
+  for (let i = 1; i <= Math.min(count, 4); i += 1) {
+    const text = inputData[`btn${i}Text`];
+    if (!text) continue;
+    const type = inputData[`btn${i}Type`] || 'reply';
+    const postbackData = inputData[`btn${i}Postback`] || text;
+    if (type === 'open_url') {
+      chips.push({ action: { text, postbackData, openUrlAction: { url: inputData[`btn${i}Url`] } } });
+    } else if (type === 'dial') {
+      const action = { text, postbackData, dialAction: { phoneNumber: inputData[`btn${i}Phone`] } };
+      if (inputData[`btn${i}Fallback`]) action.fallbackUrl = inputData[`btn${i}Fallback`];
+      chips.push({ action });
+    } else {
+      chips.push({ reply: { text, postbackData } });
+    }
+  }
+  return chips;
+};
+
+// Send a built payload over the Messages API on the given (fixed or chosen)
+// channel. Shared by send_message and the named single-channel actions.
+const sendVia = async (z, bundle, channel) => {
+  const { from } = bundle.inputData;
+
+  const payload = buildMessagePayload({ ...bundle.inputData, channel });
+
+  // Every channel signs with the managed application JWT (injected by the
+  // middleware via the "Bearer undefined" patch).
+  const host = bundle.inputData.sandbox
+    ? 'messages-sandbox.nexmo.com'
+    : 'api.nexmo.com';
+  const response = await z.request({
+    url: `https://${host}/v1/messages`,
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      Authorization: `Bearer ${bundle.authData._jwt}`,
+      // Read by the afterResponse middleware: a 401 on a chat channel means
+      // "sender not linked to the application", not a stale key — translate it
+      // instead of entering the RefreshAuthError loop (which ends in a cryptic
+      // "halted execution" error after the retry gets 401 again).
+      ...(CHAT_CHANNELS.includes(channel)
+        ? { 'X-Connector-Chat-Channel': channel }
+        : {}),
+    },
+    body: payload,
+    skipThrowForStatus: true,
+  });
+
+  if (response.status >= 400) {
+    const err = response.json || {};
+    const detail = err.title || err.detail || JSON.stringify(err);
+
+    // On chat channels a 401/403/4xx almost always means the sender isn't
+    // registered for that channel on this account. Say so in plain language.
+    if (CHAT_CHANNELS.includes(channel)) {
+      throw new z.errors.Error(
+        `Vonage couldn't send on ${channel} from "${from}". This usually means that sender isn't registered for ${channel} on your Vonage account — pick a registered sender from the dropdown, or set it up in the Vonage dashboard first. (Vonage said: ${detail})`
+      );
+    }
+    throw new z.errors.Error(`Messages API error: ${detail}`);
+  }
+
+  return response.json;
+};
+
+// --- Dynamic fields ---------------------------------------------------------
+// Which message types each channel actually supports.
+const TYPES_BY_CHANNEL = {
+  sms: ['text'],
+  whatsapp: ['text', 'image', 'audio', 'video', 'file', 'template'],
+  mms: ['image', 'audio', 'video', 'file'],
+  viber_service: ['text', 'image', 'video', 'file'],
+  instagram: ['text', 'image', 'audio', 'video', 'file'],
+  messenger: ['text', 'image', 'audio', 'video', 'file'],
+  rcs: ['text', 'image', 'video', 'file', 'card', 'carousel'],
+};
+const ALL_TYPES = ['text', 'image', 'audio', 'video', 'file', 'template'];
+
+// Content fields, one set per message type — only the relevant ones are shown.
+const IMAGE_URL_FIELD = { key: 'imageUrl', label: 'Image URL', type: 'string', required: true, helpText: 'Direct URL of the image file (must end in .jpg/.png and return an image, not a web page).' };
+const IMAGE_CAPTION_FIELD = { key: 'imageCaption', label: 'Image Caption', type: 'string', required: false };
+
+const CONTENT_FIELDS = {
+  text: [
+    { key: 'text', label: 'Text', type: 'text', required: true, helpText: 'Message body.' },
+  ],
+  image: [IMAGE_URL_FIELD, IMAGE_CAPTION_FIELD],
+  audio: [
+    { key: 'audioUrl', label: 'Audio URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the audio file.' },
+  ],
+  video: [
+    { key: 'videoUrl', label: 'Video URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the video file.' },
+  ],
+  file: [
+    { key: 'fileUrl', label: 'File URL', type: 'string', required: true, helpText: 'Publicly accessible URL of the file.' },
+  ],
+  template: [
+    { key: 'templateName', label: 'Template Name', type: 'string', required: true, helpText: 'WhatsApp approved template name.' },
+    { key: 'templateLanguage', label: 'Template Language Code', type: 'string', required: false, default: 'en_US' },
+    { key: 'templateComponents', label: 'Template Components (JSON)', type: 'text', required: false, helpText: 'JSON array of WhatsApp template components (header, body, buttons).' },
+  ],
+  // RCS Rich Card — image + title + description + up to 4 reply buttons.
+  card: [
+    { key: 'cardMediaUrl', label: 'Image / Media URL', type: 'string', required: true, helpText: 'Direct URL of the image (or video/PDF) shown on the card. Must return media, not a web page.' },
+    { key: 'cardTitle', label: 'Card Title', type: 'string', required: false, helpText: 'Up to 200 characters.' },
+    { key: 'cardText', label: 'Card Description', type: 'text', required: false, helpText: 'Up to 2000 characters.' },
+    { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'] },
+    { key: 'cardButtonCount', label: 'Number of Buttons', type: 'integer', required: false, default: '0', choices: ['0', '1', '2', '3', '4'], altersDynamicFields: true, helpText: 'RCS cards support up to 4 tappable buttons. Pick how many, then fill them in below.' },
+  ],
+  // RCS Carousel — 2 to 10 swipeable cards, each with image + title +
+  // description and an optional tappable button.
+  carousel: [
+    { key: 'carouselCardWidth', label: 'Card Width', type: 'string', required: false, default: 'MEDIUM', choices: ['SMALL', 'MEDIUM'] },
+    { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'], helpText: 'Applies to every card in the carousel.' },
+    { key: 'carouselCardCount', label: 'Number of Cards', type: 'integer', required: true, default: '2', choices: ['2', '3', '4', '5', '6', '7', '8', '9', '10'], altersDynamicFields: true, helpText: 'RCS carousels hold 2 to 10 cards. Pick how many, then fill them in below.' },
+  ],
+};
+
+// The per-card fields of a carousel, generated for cards 1..N. Each card can
+// carry one optional button; its type decides which extra fields show.
+const carouselCardFieldsFor = (i, btnType) => {
+  const fields = [
+    { key: `crd${i}MediaUrl`, label: `Card ${i} — Image / Media URL`, type: 'string', required: true, helpText: 'Direct URL of the image shown on this card. Must return media, not a web page.' },
+    { key: `crd${i}Title`, label: `Card ${i} — Title`, type: 'string', required: false, helpText: 'Up to 200 characters.' },
+    { key: `crd${i}Text`, label: `Card ${i} — Description`, type: 'text', required: false, helpText: 'Up to 2000 characters.' },
+    { key: `crd${i}BtnType`, label: `Card ${i} — Button`, type: 'string', required: false, default: 'none', choices: ['none', 'reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'Optional button on this card: reply = quick reply · open_url = open a web page · dial = call a number.' },
+  ];
+  if (btnType && btnType !== 'none') {
+    fields.push(
+      { key: `crd${i}BtnText`, label: `Card ${i} — Button Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
+      { key: `crd${i}BtnPostback`, label: `Card ${i} — Button Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
+    );
+    if (btnType === 'open_url') {
+      fields.push({ key: `crd${i}BtnUrl`, label: `Card ${i} — Button Link`, type: 'string', required: true, helpText: 'Web page to open when the button is tapped.' });
+    } else if (btnType === 'dial') {
+      fields.push({ key: `crd${i}BtnPhone`, label: `Card ${i} — Button Phone Number`, type: 'string', required: true, helpText: 'Number to call in E.164 with + (e.g. +44…).' });
+    }
+  }
+  return fields;
+};
+
+// The per-button fields, generated for buttons 1..N (N = Number of Buttons).
+// Only the fields that apply to the chosen button type are shown — the Type
+// field re-renders the form (altersDynamicFields) like Number of Buttons does.
+const buttonFieldsFor = (i, type) => {
+  const fields = [
+    { key: `btn${i}Type`, label: `Button ${i} — Type`, type: 'string', default: 'reply', choices: ['reply', 'open_url', 'dial'], altersDynamicFields: true, helpText: 'reply = quick reply · open_url = open a web page · dial = call a number.' },
+    { key: `btn${i}Text`, label: `Button ${i} — Text`, type: 'string', required: true, helpText: 'Chip label, max 25 characters.' },
+    { key: `btn${i}Postback`, label: `Button ${i} — Postback Data`, type: 'string', helpText: 'Identifier returned to your inbound trigger when this button is tapped (defaults to the text).' },
+  ];
+  if (type === 'open_url') {
+    fields.push(
+      { key: `btn${i}Url`, label: `Button ${i} — Link`, type: 'string', required: true, helpText: 'Web page to open when the button is tapped.' },
+    );
+  } else if (type === 'dial') {
+    fields.push(
+      { key: `btn${i}Phone`, label: `Button ${i} — Phone Number`, type: 'string', required: true, helpText: 'Number to call in E.164 with + (e.g. +44…).' },
+      { key: `btn${i}Fallback`, label: `Button ${i} — Fallback URL (optional)`, type: 'string', helpText: "Web page to open if the device can't place the call." },
+    );
+  }
+  return fields;
+};
+
+// Message Type field, with choices limited to what the chosen channel supports.
+const makeMessageTypeField = (channel) => {
+  const choices = TYPES_BY_CHANNEL[channel] || ALL_TYPES;
+  return {
+    key: 'messageType',
+    label: 'Message Type',
+    type: 'string',
+    required: true,
+    choices,
+    default: choices[0],
+    altersDynamicFields: true,
+  };
+};
+
+// Dynamic Message Type field for the multi-channel action (channel from input).
+const messageTypeField = (z, bundle) => makeMessageTypeField(bundle.inputData.channel);
+
+// Fixed-channel Message Type field for the named actions (channel via closure).
+// The channel is known up front, so this is a plain static field object.
+const messageTypeFieldFor = (channel) => makeMessageTypeField(channel);
+
+// Content fields for the given (fixed or chosen) channel and the message type
+// the user has picked. Shared core of the dynamic `contentFields` below.
+const computeContentFields = (channel, inputData) => {
+  const mt = inputData.messageType;
+  // Fall back to the channel's first/only type so text-only channels (SMS)
+  // still show their field before the user touches Message Type.
+  const type = mt || (TYPES_BY_CHANNEL[channel] || ALL_TYPES)[0];
+  // Image caption only shows on channels that accept it (not RCS).
+  if (type === 'image') {
+    return CAPTION_CHANNELS.includes(channel)
+      ? [IMAGE_URL_FIELD, IMAGE_CAPTION_FIELD]
+      : [IMAGE_URL_FIELD];
+  }
+  // Rich Card: base fields + one block of fields per requested button.
+  if (type === 'card') {
+    const count = parseInt(inputData.cardButtonCount, 10) || 0;
+    const fields = [...CONTENT_FIELDS.card];
+    for (let i = 1; i <= Math.min(count, 4); i += 1) {
+      fields.push(...buttonFieldsFor(i, inputData[`btn${i}Type`] || 'reply'));
+    }
+    return fields;
+  }
+  // Carousel: base fields + one block of fields per requested card.
+  if (type === 'carousel') {
+    const count = Math.min(Math.max(parseInt(inputData.carouselCardCount, 10) || 2, 2), 10);
+    const fields = [...CONTENT_FIELDS.carousel];
+    for (let i = 1; i <= count; i += 1) {
+      fields.push(...carouselCardFieldsFor(i, inputData[`crd${i}BtnType`] || 'none'));
+    }
+    return fields;
+  }
+  return CONTENT_FIELDS[type] || CONTENT_FIELDS.text;
+};
+
+// Dynamic content fields for the multi-channel action (channel from input).
+const contentFields = (z, bundle) => computeContentFields(bundle.inputData.channel, bundle.inputData);
+
+// Fixed-channel content fields for the named actions (channel via closure).
+const contentFieldsFor = (channel) => (z, bundle) => computeContentFields(channel, bundle.inputData);
+
+// Factory for a named single-channel send action. The channel is fixed (no
+// Channel field) for discoverability; everything else mirrors send_message.
+const makeChannelSend = (channel, { key, noun, label, description }) => ({
+  key,
+  noun,
+  display: { label, description },
+  operation: {
+    inputFields: [
+      // Message Type — choices limited to what this channel supports.
+      messageTypeFieldFor(channel),
+      {
+        key: 'to',
+        label: 'To',
+        type: 'string',
+        required: true,
+        helpText: 'Recipient number in E.164 format or platform-specific ID.',
+      },
+      {
+        key: 'from',
+        label: 'From',
+        type: 'string',
+        required: true,
+        dynamic: 'list_senders.id.label',
+        helpText:
+          'Pick a registered sender, or type a Vonage number, WhatsApp Business number, or sender ID.',
+      },
+      // Content fields — only those tied to the selected message type.
+      contentFieldsFor(channel),
+      {
+        key: 'sandbox',
+        label: 'Sandbox Mode',
+        type: 'boolean',
+        required: false,
+        default: 'false',
+        helpText:
+          'Send through the Vonage Messages Sandbox (messages-sandbox.nexmo.com) for testing instead of live delivery.',
+      },
+    ],
+    perform: (z, bundle) => sendVia(z, bundle, channel),
+    sample: {
+      message_uuid: 'aaaaaaaa-bbbb-cccc-dddd-0123456789ab',
+      to: '15559876543',
+      from: '15551234567',
+      channel,
+    },
+    outputFields: [
+      { key: 'message_uuid', label: 'Message UUID' },
+      { key: 'to', label: 'To' },
+      { key: 'from', label: 'From' },
+      { key: 'channel', label: 'Channel' },
+    ],
+  },
+});
+
+module.exports = {
+  // Constants
+  CHAT_CHANNELS,
+  CAPTION_CHANNELS,
+  TYPES_BY_CHANNEL,
+  ALL_TYPES,
+  CONTENT_FIELDS,
+  // Payload builders
+  buildMessagePayload,
+  buildSuggestions,
+  // Field helpers
+  carouselCardFieldsFor,
+  buttonFieldsFor,
+  messageTypeField,
+  messageTypeFieldFor,
+  contentFields,
+  contentFieldsFor,
+  // Request engine + factory
+  sendVia,
+  makeChannelSend,
+};

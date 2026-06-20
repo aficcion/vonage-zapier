@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0
+
+- New action **Send WhatsApp Message** — the full WhatsApp feature set (text, image, audio, video, file, and approved templates) as a named, discoverable action. The channel is fixed to WhatsApp, so there's no channel picker; everything else matches **Send Message**.
+- New action **Send RCS Message** — the full RCS feature set (text, image, video, file, rich **card**, and **carousel** with reply / open-URL / dial buttons) as a named, discoverable action. The channel is fixed to RCS.
+- New action **API Request** — a raw, authenticated passthrough to any Vonage API endpoint (parity with Twilio's / Telnyx's generic request action). Pick the method, URL and auth scheme (`jwt` for Messages/Voice/Verify, `basic` for account/balance/Number Insight), add optional JSON headers, query parameters and body, and get back `{ status, headers, body }`. A 4xx/5xx is returned (not thrown) so you can inspect the body and branch on the status.
+- **Send Message (Multi-Channel)** is unchanged and stays the catch-all: it still covers every channel — including the long-tail ones the named actions don't surface (MMS, Viber, Messenger, Instagram) — plus the complete RCS card/carousel and WhatsApp template feature set. The named WhatsApp/RCS actions are additive and reuse the same Messages API engine.
+- Richer output fields and samples on the **New Inbound Message** and **Message Status Updated** triggers (message UUID, from, to, channel, message type, text, status, timestamps, error details) for easier field mapping in later Zap steps.
+
 ## 1.4.0
 
 - New **Advanced (bring-your-own-app)** connection mode, for parity with the Power Automate connector. The connection gains two optional fields — **Application ID** and **Private Key**: fill them to send from your own existing Vonage application; leave them blank to keep the default Managed behaviour (the connector provisions and self-heals a `Zapier` application for you). In Advanced mode the connector never creates, modifies or rotates an application or key. A 401 in Advanced mode now reports a clear "check your Application ID / Private Key" error instead of looping the auth refresh.

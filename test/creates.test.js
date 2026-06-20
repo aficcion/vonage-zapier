@@ -346,3 +346,140 @@ describe('v1.2 fixes', () => {
     expect(() => refreshOnInvalidJwt(plain401, z, {})).toThrow(FakeRefresh);
   });
 });
+
+describe('v1.5 — named channel sends (Send WhatsApp / Send RCS)', () => {
+  test('send_whatsapp and send_rcs are registered with the right keys and nouns', () => {
+    expect(App.creates.send_whatsapp).toBeDefined();
+    expect(App.creates.send_whatsapp.key).toBe('send_whatsapp');
+    expect(App.creates.send_whatsapp.noun).toBe('WhatsApp Message');
+    expect(App.creates.send_rcs).toBeDefined();
+    expect(App.creates.send_rcs.key).toBe('send_rcs');
+    expect(App.creates.send_rcs.noun).toBe('RCS Message');
+  });
+
+  test('the multi-channel send is NOT removed (additive, not a replacement)', () => {
+    expect(App.creates.send_message).toBeDefined();
+    expect(App.creates.send_message.key).toBe('send_message');
+  });
+
+  test('both expose To, From (dynamic senders) and a fixed Message Type field — no Channel field', () => {
+    ['send_whatsapp', 'send_rcs'].forEach((key) => {
+      const fields = App.creates[key].operation.inputFields;
+      const staticKeys = fields
+        .filter((f) => typeof f === 'object')
+        .map((f) => f.key);
+      expect(staticKeys).toContain('to');
+      expect(staticKeys).toContain('from');
+      expect(staticKeys).toContain('messageType');
+      expect(staticKeys).not.toContain('channel'); // channel is fixed
+      const from = fields.find((f) => typeof f === 'object' && f.key === 'from');
+      expect(from.dynamic).toBe('list_senders.id.label');
+    });
+  });
+
+  test('completeness: Send WhatsApp offers template; Send RCS offers card and carousel', () => {
+    const waType = App.creates.send_whatsapp.operation.inputFields.find(
+      (f) => typeof f === 'object' && f.key === 'messageType'
+    );
+    expect(waType.choices).toContain('text');
+    expect(waType.choices).toContain('image');
+    expect(waType.choices).toContain('template');
+
+    const rcsType = App.creates.send_rcs.operation.inputFields.find(
+      (f) => typeof f === 'object' && f.key === 'messageType'
+    );
+    expect(rcsType.choices).toContain('card');
+    expect(rcsType.choices).toContain('carousel');
+  });
+
+  test('content fields follow the fixed channel (RCS reveals card fields, WhatsApp keeps caption)', () => {
+    const rcsContent = App.creates.send_rcs.operation.inputFields.find(
+      (f) => typeof f === 'function'
+    );
+    const cardFields = rcsContent(null, { inputData: { messageType: 'card' } }).map((f) => f.key);
+    expect(cardFields).toContain('cardMediaUrl');
+    expect(cardFields).toContain('cardButtonCount');
+
+    const waContent = App.creates.send_whatsapp.operation.inputFields.find(
+      (f) => typeof f === 'function'
+    );
+    const waImg = waContent(null, { inputData: { messageType: 'image' } }).map((f) => f.key);
+    expect(waImg).toContain('imageCaption'); // WhatsApp supports image caption
+  });
+});
+
+describe('v1.5 — API Request passthrough', () => {
+  test('is registered and exposes method, url and auth', () => {
+    expect(App.creates.api_request).toBeDefined();
+    expect(App.creates.api_request.key).toBe('api_request');
+    const fields = App.creates.api_request.operation.inputFields.map((f) => f.key);
+    expect(fields).toContain('method');
+    expect(fields).toContain('url');
+    expect(fields).toContain('auth');
+  });
+
+  test('url is required, auth defaults to jwt, method defaults to GET', () => {
+    const fields = Object.fromEntries(
+      App.creates.api_request.operation.inputFields.map((f) => [f.key, f])
+    );
+    expect(fields.url.required).toBe(true);
+    expect(fields.auth.default).toBe('jwt');
+    expect(fields.method.default).toBe('GET');
+    expect(fields.auth.choices).toEqual(['jwt', 'basic']);
+  });
+});
+
+describe('v1.5 — buildMessagePayload (shared engine)', () => {
+  const { buildMessagePayload } = require('../creates/_channel_send');
+
+  test('whatsapp template builds the template block', () => {
+    const p = buildMessagePayload({
+      channel: 'whatsapp',
+      messageType: 'template',
+      to: '+1 555 987 6543',
+      from: 'MyBrand',
+      templateName: 'welcome',
+      templateLanguage: 'en_US',
+    });
+    expect(p.channel).toBe('whatsapp');
+    expect(p.message_type).toBe('template');
+    expect(p.template.name).toBe('welcome');
+    expect(p.template.language.code).toBe('en_US');
+    expect(p.to).toBe('15559876543'); // normalised
+  });
+
+  test('rcs card builds a custom richCard standaloneCard', () => {
+    const p = buildMessagePayload({
+      channel: 'rcs',
+      messageType: 'card',
+      to: '15559876543',
+      from: 'agent-id',
+      cardMediaUrl: 'https://example.com/photo.jpg',
+      cardTitle: 'Hello',
+      cardText: 'Body text',
+    });
+    expect(p.message_type).toBe('custom');
+    const card = p.custom.contentMessage.richCard.standaloneCard;
+    expect(card).toBeDefined();
+    expect(card.cardContent.media.contentInfo.fileUrl).toBe('https://example.com/photo.jpg');
+    expect(card.cardContent.title).toBe('Hello');
+  });
+
+  test('rcs carousel builds a custom richCard carouselCard with N cards', () => {
+    const p = buildMessagePayload({
+      channel: 'rcs',
+      messageType: 'carousel',
+      to: '15559876543',
+      from: 'agent-id',
+      carouselCardCount: 3,
+      crd1MediaUrl: 'https://example.com/1.jpg',
+      crd2MediaUrl: 'https://example.com/2.jpg',
+      crd3MediaUrl: 'https://example.com/3.jpg',
+    });
+    expect(p.message_type).toBe('custom');
+    const carousel = p.custom.contentMessage.richCard.carouselCard;
+    expect(carousel).toBeDefined();
+    expect(carousel.cardContents).toHaveLength(3);
+    expect(carousel.cardContents[0].media.contentInfo.fileUrl).toBe('https://example.com/1.jpg');
+  });
+});

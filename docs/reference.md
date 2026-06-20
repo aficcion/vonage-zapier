@@ -29,10 +29,14 @@ REST-hook triggers subscribe a webhook when a Zap is turned on and unsubscribe w
 | Action | key | What it does |
 |--------|-----|--------------|
 | **Send SMS** | `send_sms` | Send a plain SMS — the simplest send path. |
-| **Send Message (Multi-Channel)** | `send_message` | Send across any supported channel: pick a channel and message type, then fill the type-specific fields. Covers text, media (image/audio/video/file), WhatsApp templates, and RCS Rich Cards / carousels. |
+| **Send WhatsApp Message** | `send_whatsapp` | Send a WhatsApp message — text, image, audio, video, file, or an approved template. Same engine as Send Message, with the channel fixed to WhatsApp for discoverability. |
+| **Send RCS Message** | `send_rcs` | Send an RCS message — text, image, video, file, rich **card**, or **carousel** (with reply / open-URL / dial buttons). Channel fixed to RCS. |
+| **Send Message (Multi-Channel)** | `send_message` | The catch-all send: pick a channel and message type, then fill the type-specific fields. Covers every channel — including MMS, Viber, Messenger and Instagram, which the named actions don't surface — plus text, media (image/audio/video/file), WhatsApp templates, and RCS Rich Cards / carousels. |
 | **Make Outbound Call** | `make_call` | Place a Voice API call (text-to-speech NCCO). |
 
-Supported channel → message-type combinations for **Send Message**:
+The named **Send WhatsApp** / **Send RCS** actions and the multi-channel **Send Message** share one Messages API engine ([`creates/_channel_send.js`](../creates/_channel_send.js)); the named actions are exactly Send Message with the channel pinned, nothing removed.
+
+Supported channel → message-type combinations for **Send Message** (and, fixed to one row, the named actions):
 
 | Channel | Message types |
 |---------|---------------|
@@ -53,6 +57,12 @@ Phone numbers are normalised to E.164 without `+` (alphanumeric sender IDs and R
 | **Send Verification Code (2FA)** | `send_verify` | Start a Verify v2 workflow (default channel SMS). Returns a `request_id`. Signed with the Application JWT so its events reach the `verify_event` trigger. |
 | **Check Verification Code** | `check_verify` | Check a PIN against a `request_id`. |
 | **Cancel Verification Request** | `cancel_verify` | Cancel an in-flight verification. |
+
+### Advanced
+
+| Action | key | What it does |
+|--------|-----|--------------|
+| **API Request** | `api_request` | Raw authenticated passthrough to any Vonage endpoint. Choose **Method**, **URL** and **Authentication** (`jwt` = managed application Bearer token for Messages/Voice/Verify/Applications; `basic` = API key/secret for account, balance, Number Insight and legacy REST), plus optional JSON **Headers**, **Query Parameters** and **Body**. Returns `{ status, headers, body }`; a 4xx/5xx is returned, not thrown, so you can inspect the body and branch on the status. The escape hatch for endpoints the connector doesn't model as a first-class action. |
 
 ## Searches
 

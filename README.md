@@ -41,7 +41,7 @@ flowchart LR
 | Kind | Items |
 |------|-------|
 | **Triggers** | Inbound message, Message status, Inbound call, Call status, Verify event (+ dynamic dropdowns: list numbers, list senders) |
-| **Actions** | Send SMS, Send message (multi-channel), Make call, Send/Check/Cancel verification |
+| **Actions** | Send SMS, Send WhatsApp, Send RCS, Send message (multi-channel), Make call, Send/Check/Cancel verification, API Request (raw passthrough) |
 | **Searches** | Number Insight, Get account balance |
 
 See **[docs/reference.md](docs/reference.md)** for the full list.
@@ -70,5 +70,6 @@ The integration is built on `zapier-platform-core` 19. App definition entry poin
 | `jwt_middleware.js` | `beforeRequest`/`afterResponse`: signs the JWT and self-heals on a stale key. |
 | `app_webhooks.js` | Subscribe/unsubscribe plumbing for the Vonage Application webhooks. |
 | `phone.js` | Phone-number normalisation. |
+| `creates/_channel_send.js` | Shared Messages API engine (payload builder, dynamic fields, request) behind Send Message, Send WhatsApp and Send RCS. |
 | `triggers/`, `creates/`, `searches/` | One file per trigger, action and search. |
 | `notes/` | Internal working notes and demo assets. Local only — not tracked. |
