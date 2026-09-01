@@ -190,7 +190,7 @@ describe('send_message', () => {
     const mtForWa = dynFns[0](null, { inputData: { channel: 'whatsapp' } });
     expect(mtForWa.choices).not.toContain('card');
     const cardFields = dynFns[1](null, { inputData: { channel: 'rcs', messageType: 'card' } }).map((f) => f.key);
-    expect(cardFields).toEqual(['cardMediaUrl', 'cardTitle', 'cardText', 'cardMediaHeight', 'cardButtonCount']);
+    expect(cardFields).toEqual(['cardMediaUrl', 'cardTitle', 'cardText', 'cardMediaHeight', 'cardButtonCount', 'buttonOrder']);
     // Picking N buttons reveals N blocks of button fields, and each block
     // only shows the fields for its button type (reply by default).
     const with2 = dynFns[1](null, { inputData: { channel: 'rcs', messageType: 'card', cardButtonCount: 2 } }).map((f) => f.key);
@@ -740,5 +740,97 @@ describe('v1.7 — Readiness Gate (Security / Compliance / BI / Consent)', () =>
     const normal = run('hello there');
     expect(normal.isOptOut).toBe(false);
     expect(normal.isOptIn).toBe(false);
+  });
+});
+
+describe('v1.8 — card/button order lists (structural editing)', () => {
+  const { buildMessagePayload, parseOrder, CONTENT_FIELDS } = require('../creates/_channel_send');
+
+  const carousel = (extra) => buildMessagePayload({
+    channel: 'rcs',
+    messageType: 'carousel',
+    to: '15559876543',
+    from: 'agent-id',
+    carouselCardCount: 5,
+    crd1MediaUrl: 'https://example.com/1.jpg',
+    crd2MediaUrl: 'https://example.com/2.jpg',
+    crd3MediaUrl: 'https://example.com/3.jpg',
+    crd4MediaUrl: 'https://example.com/4.jpg',
+    crd5MediaUrl: 'https://example.com/5.jpg',
+    ...extra,
+  });
+
+  const urls = (p) =>
+    p.custom.contentMessage.richCard.carouselCard.cardContents.map(
+      (c) => c.media.contentInfo.fileUrl
+    );
+
+  test('parseOrder falls back to the natural 1..N order when blank or absent', () => {
+    expect(parseOrder(undefined, 3, 'Card Order')).toEqual([1, 2, 3]);
+    expect(parseOrder('', 3, 'Card Order')).toEqual([1, 2, 3]);
+    expect(parseOrder('   ', 3, 'Card Order')).toEqual([1, 2, 3]);
+  });
+
+  test('parseOrder tolerates spacing and keeps deliberate repeats', () => {
+    expect(parseOrder(' 1 , 3,3 ', 3, 'Card Order')).toEqual([1, 3, 3]);
+  });
+
+  test('parseOrder rejects out-of-range and non-numeric slots by field name', () => {
+    expect(() => parseOrder('1,9', 5, 'Card Order')).toThrow(/"Card Order".*"9".*between 1 and 5/);
+    expect(() => parseOrder('1,two', 5, 'Card Order')).toThrow(/"two"/);
+    expect(() => parseOrder('0,1', 5, 'Card Order')).toThrow(/"0"/);
+  });
+
+  test('an omitted card is dropped without disturbing the ones after it', () => {
+    // The whole point: deleting card 2 of 5 must not renumber 3, 4 and 5.
+    expect(urls(carousel({ cardOrder: '1,3,4,5' }))).toEqual([
+      'https://example.com/1.jpg',
+      'https://example.com/3.jpg',
+      'https://example.com/4.jpg',
+      'https://example.com/5.jpg',
+    ]);
+  });
+
+  test('cards can be reordered and duplicated from the order list alone', () => {
+    expect(urls(carousel({ cardOrder: '4,1,2,3,5' }))[0]).toBe('https://example.com/4.jpg');
+    expect(urls(carousel({ cardOrder: '1,3,3,4' }))).toEqual([
+      'https://example.com/1.jpg',
+      'https://example.com/3.jpg',
+      'https://example.com/3.jpg',
+      'https://example.com/4.jpg',
+    ]);
+  });
+
+  test('a blank order still sends every card, unchanged from before', () => {
+    expect(urls(carousel({}))).toHaveLength(5);
+    expect(urls(carousel({ cardOrder: '' }))).toHaveLength(5);
+  });
+
+  test('an order that leaves fewer than 2 cards is refused with a clear message', () => {
+    expect(() => carousel({ cardOrder: '2' })).toThrow(/between 2 and 10 cards.*resolves to 1/);
+  });
+
+  test('card buttons honour their own order list', () => {
+    const p = buildMessagePayload({
+      channel: 'rcs',
+      messageType: 'card',
+      to: '15559876543',
+      from: 'agent-id',
+      cardMediaUrl: 'https://example.com/photo.jpg',
+      cardButtonCount: 3,
+      btn1Text: 'Yes', btn2Text: 'Maybe', btn3Text: 'No',
+      buttonOrder: '3,1',
+    });
+    const chips = p.custom.contentMessage.richCard.standaloneCard.cardContent.suggestions;
+    expect(chips.map((c) => c.reply.text)).toEqual(['No', 'Yes']);
+  });
+
+  test('the order fields are offered but never required, and do not re-render the form', () => {
+    const order = CONTENT_FIELDS.carousel.find((f) => f.key === 'cardOrder');
+    expect(order.required).toBe(false);
+    // Re-rendering here would add a "Refresh fields" round trip for no gain:
+    // the order list changes what is sent, never which fields are shown.
+    expect(order.altersDynamicFields).toBeUndefined();
+    expect(CONTENT_FIELDS.card.find((f) => f.key === 'buttonOrder').altersDynamicFields).toBeUndefined();
   });
 });

@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.8.0
+
+**Structural editing for RCS cards and carousels.**
+
+- New optional **Card Order** (carousel) and **Button Order** (card) fields. They take a comma-separated list of slots — `1,3,4,5` sends every card except slot 2 — separating *where a card's data lives* from *what gets sent*.
+- This makes deleting, reordering and duplicating free. Previously the slot number was the card's identity: lowering **Number of Cards** removed the *last* card, so deleting card 2 of 5 meant retyping cards 3, 4 and 5 by hand.
+- The edit is non-destructive — an omitted slot keeps its values, so adding it back to the list restores the card.
+- Neither field is `altersDynamicFields`: they change what is sent, never which fields are shown, so they cost no "Refresh fields" round trip.
+- An out-of-range or non-numeric slot raises a clear, field-named error rather than being dropped silently, and a carousel is re-checked against the 2–10 card limit after the order is resolved.
+
+See [docs/rcs-cards-and-carousels.md](docs/rcs-cards-and-carousels.md).
+
+**Tests:** 73 passing (was 64).
+
 ## 1.7.0
 
 Readiness Gate hardening (Security/Compliance, Product/BI, Consent). No change to what the connector *does* — only how it does it.
