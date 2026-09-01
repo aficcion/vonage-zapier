@@ -24,6 +24,7 @@ The **Shown because** column is the part that matters: it is what a screenshot c
 | Card Description | `Two nights, half price.` | Message Type = `card` |
 | Media Height | `MEDIUM` | Message Type = `card` |
 | **Number of Buttons** | `3` | Message Type = `card` |
+| Button Order | *(blank)* | Message Type = `card` |
 | Button 1 — Type | `reply` | Number of Buttons ≥ 1 |
 | Button 1 — Text | `Yes` | Number of Buttons ≥ 1 |
 | Button 1 — Postback Data | `offer_yes` | Number of Buttons ≥ 1 |
@@ -47,6 +48,7 @@ The same pattern, one level deeper: **Number of Cards** drives how many card blo
 | Card Width | `MEDIUM` | Message Type = `carousel` |
 | Media Height | `MEDIUM` | Message Type = `carousel` |
 | **Number of Cards** | `3` | Message Type = `carousel` |
+| Card Order | *(blank)* | Message Type = `carousel` |
 | Card 1 — Image / Media URL | `https://example.com/media/card-1.jpg` | Number of Cards ≥ 1 |
 | Card 1 — Title | `Card 1` | Number of Cards ≥ 1 |
 | Card 1 — Button | `reply` | Number of Cards ≥ 1 |
@@ -62,6 +64,24 @@ The same pattern, one level deeper: **Number of Cards** drives how many card blo
 | Card 3 — Button Text | `Call` | Card 3 Button ≠ `none` |
 | **Card 3 — Button Phone Number** | `+447700900000` | **Card 3 Button = `dial`** |
 | Sandbox Mode | `false` | always |
+
+## Deleting, reordering and duplicating cards
+
+The per-card fields are keyed by position — `crd2Title` means "the title of whatever sits in slot 2" — so on its own the slot number *is* the card's identity. That makes structural edits destructive: dropping **Number of Cards** from 5 to 4 removes the **last** card, so deleting card 2 would mean retyping cards 3, 4 and 5 by hand, long media URLs included. That is where a maker abandons a 10-card carousel.
+
+**Card Order** (and **Button Order** on a card) separates *where the data lives* from *what gets sent*. It is an optional comma-separated list of slots; blank means the natural `1..N` order.
+
+| To | Set Card Order to |
+|----|-------------------|
+| Drop card 2 of 5 | `1,3,4,5` |
+| Move card 4 to the front | `4,1,2,3,5` |
+| Duplicate card 3 | `1,2,3,3,4,5` |
+
+No field is retyped, and the edit is non-destructive: the omitted slot keeps its values, so putting `2` back restores the card.
+
+Two deliberate choices. The field is **not** `altersDynamicFields` — it changes what is sent, never which fields are shown, so it costs no "Refresh fields" round trip. And a slot that is out of range or not a number is an **error**, not a silent drop: a typo must not quietly ship a carousel with a card missing. `parseOrder` in [`creates/_channel_send.js`](../creates/_channel_send.js) raises a message naming the field and the offending value, and the carousel is re-checked against the 2–10 card limit after the list is resolved.
+
+This addresses structural editing only. It gives no preview, no visual grouping of a card's fields, and no inline validation of title or description length — those remain real limits of a flat form.
 
 ## How it's built
 

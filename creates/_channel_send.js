@@ -24,6 +24,44 @@ const CHAT_CHANNELS = ['whatsapp', 'mms', 'viber_service', 'messenger', 'rcs', '
 // returns 422 "image.caption is not supported for the given channel".
 const CAPTION_CHANNELS = ['whatsapp', 'mms', 'messenger', 'viber_service'];
 
+// Resolve an optional "1,3,4" order list into the slot numbers to send.
+//
+// The per-card / per-button fields are keyed by position (`crd2Title` means
+// "the title of whatever sits in slot 2"), so without this the slot number IS
+// the card's identity: dropping the count from 5 to 4 removes the LAST card,
+// and deleting card 2 means retyping cards 3, 4 and 5 by hand. An order list
+// separates "where the data lives" from "what gets sent", which makes delete,
+// reorder and duplicate free — and non-destructive, since the omitted slot
+// keeps its values and can be added back.
+//
+// Blank or absent means the natural 1..count order. Repeats are allowed on
+// purpose (duplicating a card is legitimate); anything that isn't a slot in
+// range is an error rather than a silent drop, so a typo can't quietly ship a
+// carousel that's missing a card.
+const parseOrder = (raw, count, fieldLabel) => {
+  if (raw === undefined || raw === null || String(raw).trim() === '') {
+    return Array.from({ length: count }, (_, k) => k + 1);
+  }
+  const slots = [];
+  const bad = [];
+  String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s !== '')
+    .forEach((token) => {
+      const n = Number(token);
+      if (!Number.isInteger(n) || n < 1 || n > count) bad.push(token);
+      else slots.push(n);
+    });
+  if (bad.length) {
+    throw new Error(
+      `The "${fieldLabel}" field lists ${bad.map((b) => `"${b}"`).join(', ')}, ` +
+        `which ${bad.length === 1 ? 'is not a slot' : 'are not slots'} between 1 and ${count}.`
+    );
+  }
+  return slots;
+};
+
 const buildMessagePayload = (inputData) => {
   const { channel, messageType, to, from, text, imageUrl, imageCaption,
     audioUrl, videoUrl, fileUrl, templateName, templateLanguage,
@@ -107,8 +145,15 @@ const buildMessagePayload = (inputData) => {
 
   if (messageType === 'carousel') {
     const count = Math.min(Math.max(parseInt(inputData.carouselCardCount, 10) || 2, 2), 10);
+    const slots = parseOrder(inputData.cardOrder, count, 'Card Order');
+    if (slots.length < 2 || slots.length > 10) {
+      throw new Error(
+        `An RCS carousel holds between 2 and 10 cards, but "Card Order" resolves to ${slots.length}. ` +
+          'Adjust the order list (or leave it blank to send every card in slot order).'
+      );
+    }
     const cardContents = [];
-    for (let i = 1; i <= count; i += 1) {
+    slots.forEach((i) => {
       const content = {
         media: {
           height: inputData.cardMediaHeight || 'MEDIUM',
@@ -130,7 +175,7 @@ const buildMessagePayload = (inputData) => {
         }
       }
       cardContents.push(content);
-    }
+    });
     return {
       ...base,
       message_type: 'custom',
@@ -155,9 +200,15 @@ const buildMessagePayload = (inputData) => {
 // open_url -> {action:{...openUrlAction}}; dial -> {action:{...dialAction}}
 // with the phone number kept in E.164 (+) and an optional fallbackUrl.
 const buildSuggestions = (inputData) => {
-  const count = parseInt(inputData.cardButtonCount, 10) || 0;
+  const count = Math.min(parseInt(inputData.cardButtonCount, 10) || 0, 4);
+  const slots = parseOrder(inputData.buttonOrder, count, 'Button Order');
+  if (slots.length > 4) {
+    throw new Error(
+      `An RCS card holds at most 4 buttons, but "Button Order" resolves to ${slots.length}.`
+    );
+  }
   const chips = [];
-  for (let i = 1; i <= Math.min(count, 4); i += 1) {
+  for (const i of slots) {
     const text = inputData[`btn${i}Text`];
     if (!text) continue;
     const type = inputData[`btn${i}Type`] || 'reply';
@@ -273,6 +324,7 @@ const CONTENT_FIELDS = {
     { key: 'cardText', label: 'Card Description', type: 'text', required: false, helpText: 'Up to 2000 characters.' },
     { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'] },
     { key: 'cardButtonCount', label: 'Number of Buttons', type: 'integer', required: false, default: '0', choices: ['0', '1', '2', '3', '4'], altersDynamicFields: true, helpText: 'RCS cards support up to 4 tappable buttons. Pick how many, then fill them in below.' },
+    { key: 'buttonOrder', label: 'Button Order', type: 'string', required: false, helpText: 'Optional. Which buttons to send, in order — e.g. "1,3" sends buttons 1 and 3 and skips 2 without clearing it. Reorder by rearranging ("3,1,2"). Leave blank to send them in slot order.' },
   ],
   // RCS Carousel — 2 to 10 swipeable cards, each with image + title +
   // description and an optional tappable button.
@@ -280,6 +332,7 @@ const CONTENT_FIELDS = {
     { key: 'carouselCardWidth', label: 'Card Width', type: 'string', required: false, default: 'MEDIUM', choices: ['SMALL', 'MEDIUM'] },
     { key: 'cardMediaHeight', label: 'Media Height', type: 'string', required: false, default: 'MEDIUM', choices: ['SHORT', 'MEDIUM', 'TALL'], helpText: 'Applies to every card in the carousel.' },
     { key: 'carouselCardCount', label: 'Number of Cards', type: 'integer', required: true, default: '2', choices: ['2', '3', '4', '5', '6', '7', '8', '9', '10'], altersDynamicFields: true, helpText: 'RCS carousels hold 2 to 10 cards. Pick how many, then fill them in below.' },
+    { key: 'cardOrder', label: 'Card Order', type: 'string', required: false, helpText: 'Optional. Which cards to send, in order — e.g. "1,3,4,5" drops card 2 without clearing it, so you never retype the cards after it. Reorder by rearranging ("4,1,2,3"), repeat a number to duplicate a card. Leave blank to send every card in slot order.' },
   ],
 };
 
@@ -465,6 +518,7 @@ module.exports = {
   ALL_TYPES,
   CONTENT_FIELDS,
   // Payload builders
+  parseOrder,
   buildMessagePayload,
   buildSuggestions,
   // Field helpers
