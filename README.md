@@ -50,6 +50,7 @@ See **[docs/reference.md](docs/reference.md)** for the full list.
 
 - **[Architecture](docs/architecture.md)** — session auth, the managed Vonage Application, key/JWT signing, self-healing, and webhook hygiene.
 - **[Reference](docs/reference.md)** — every trigger, action and search.
+- **[RCS cards and carousels](docs/rcs-cards-and-carousels.md)** — how the nested card/carousel structures are expressed as flat Zapier form fields, and the rules that keep the form from breaking.
 - **[Engineering handoff](docs/handoff-to-engineering.md)** — productionization checklist and the gotchas to know before shipping.
 
 ## Development
