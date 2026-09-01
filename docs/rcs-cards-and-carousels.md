@@ -8,29 +8,31 @@ It can, and this connector does it today. This document shows the actual step co
 
 Both formats are ordinary Zapier form fields. There is no JSON textarea, no Code step, no workaround. The maker picks a number from a dropdown and the step grows the matching fields.
 
-The tables below are the live configuration of the `[E2E] Vonage — Send RCS Card` and `[E2E] Vonage — Send RCS Carousel` Zaps, verified in the Zapier editor against connector v1.7.0. The **Shown because** column is the part that matters: it is what a screenshot can't convey.
+The tables below mirror the two Zaps used to verify this in the Zapier editor against connector v1.7.0, with example values substituted for the real recipient, sender and media URLs. The field names, the structure and the dependencies are exactly as they appear in the step.
+
+The **Shown because** column is the part that matters: it is what a screenshot can't convey.
 
 ### Rich card
 
 | Field | Value | Shown because |
 |-------|-------|---------------|
 | Message Type | `card` | always |
-| To | `34622293256` | always |
-| From | `carlos_test2 — rcs (Carlos Test2)` | always |
-| Image / Media URL | `https://upload.wikimedia.org/…/The_Strokes_by_Roger_Woolman.jpg` | Message Type = `card` |
-| Card Title | `[E2E] RCS Card` | Message Type = `card` |
-| Card Description | `E2E test card 2026-06-22` | Message Type = `card` |
+| To | `447700900001` | always |
+| From | `acme_support — rcs (Acme Support)` | always |
+| Image / Media URL | `https://example.com/media/spring-offer.jpg` | Message Type = `card` |
+| Card Title | `Spring offer` | Message Type = `card` |
+| Card Description | `Two nights, half price.` | Message Type = `card` |
 | Media Height | `MEDIUM` | Message Type = `card` |
 | **Number of Buttons** | `3` | Message Type = `card` |
 | Button 1 — Type | `reply` | Number of Buttons ≥ 1 |
 | Button 1 — Text | `Yes` | Number of Buttons ≥ 1 |
-| Button 1 — Postback Data | `e2e_reply` | Number of Buttons ≥ 1 |
+| Button 1 — Postback Data | `offer_yes` | Number of Buttons ≥ 1 |
 | Button 2 — Type | `open_url` | Number of Buttons ≥ 2 |
 | Button 2 — Text | `Open` | Number of Buttons ≥ 2 |
 | **Button 2 — Link** | `https://www.vonage.com` | **Button 2 Type = `open_url`** |
 | Button 3 — Type | `dial` | Number of Buttons ≥ 3 |
 | Button 3 — Text | `Call` | Number of Buttons ≥ 3 |
-| **Button 3 — Phone Number** | `+34622293256` | **Button 3 Type = `dial`** |
+| **Button 3 — Phone Number** | `+447700900000` | **Button 3 Type = `dial`** |
 | Sandbox Mode | `false` | always |
 
 A `reply` button never shows Link or Phone Number. A `dial` button also offers an optional Fallback URL.
@@ -45,20 +47,20 @@ The same pattern, one level deeper: **Number of Cards** drives how many card blo
 | Card Width | `MEDIUM` | Message Type = `carousel` |
 | Media Height | `MEDIUM` | Message Type = `carousel` |
 | **Number of Cards** | `3` | Message Type = `carousel` |
-| Card 1 — Image / Media URL | `https://picsum.photos/id/10/600/400` | Number of Cards ≥ 1 |
+| Card 1 — Image / Media URL | `https://example.com/media/card-1.jpg` | Number of Cards ≥ 1 |
 | Card 1 — Title | `Card 1` | Number of Cards ≥ 1 |
 | Card 1 — Button | `reply` | Number of Cards ≥ 1 |
 | Card 1 — Button Text | `Reply` | Card 1 Button ≠ `none` |
-| Card 2 — Image / Media URL | `https://picsum.photos/id/20/600/400` | Number of Cards ≥ 2 |
+| Card 2 — Image / Media URL | `https://example.com/media/card-2.jpg` | Number of Cards ≥ 2 |
 | Card 2 — Title | `Card 2` | Number of Cards ≥ 2 |
 | Card 2 — Button | `open_url` | Number of Cards ≥ 2 |
 | Card 2 — Button Text | `Open` | Card 2 Button ≠ `none` |
 | **Card 2 — Button Link** | `https://www.vonage.com` | **Card 2 Button = `open_url`** |
-| Card 3 — Image / Media URL | `https://picsum.photos/id/30/600/400` | Number of Cards ≥ 3 |
+| Card 3 — Image / Media URL | `https://example.com/media/card-3.jpg` | Number of Cards ≥ 3 |
 | Card 3 — Title | `Card 3` | Number of Cards ≥ 3 |
 | Card 3 — Button | `dial` | Number of Cards ≥ 3 |
 | Card 3 — Button Text | `Call` | Card 3 Button ≠ `none` |
-| **Card 3 — Button Phone Number** | `+34622293256` | **Card 3 Button = `dial`** |
+| **Card 3 — Button Phone Number** | `+447700900000` | **Card 3 Button = `dial`** |
 | Sandbox Mode | `false` | always |
 
 ## How it's built
